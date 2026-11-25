@@ -60,6 +60,21 @@ jobs:
           persist-credentials: false
 
       # ubuntu-latest already has the Android SDK in ANDROID_HOME (no setup-android step: it fails on the runner's sdkmanager)
+      - name: Generate the game's data (data.cpp) from the split (needs GAME_DATA_TOKEN)
+        if: env.GAME_DATA_TOKEN != '' && env.GAME_DATA_REPO != ''
+        run: |
+          # The PS2 toolchain (ps2dev's release) goes to /usr/local/ps2dev, where the engine's tools look for it.
+          curl -fL --retry 3 -o /tmp/ps2dev.tar.gz https://github.com/ps2dev/ps2dev/releases/download/latest/ps2dev-ubuntu-latest.tar.gz
+          sudo tar -xzf /tmp/ps2dev.tar.gz -C /usr/local
+          sudo apt-get update -q
+          sudo apt-get install -y -q clang-20
+          # The split is copied into the tree for this run only: asm/, assets/ and SLES_525.68 are gitignored.
+          cp -r build-input/. .
+          export TWIN_CLANG=clang++-20
+          python3 native/tools/data_types.py
+          python3 native/tools/convert_data.py
+          ls -la build/native/data.cpp
+
       - name: Build the APK
         working-directory: android
         run: gradle --no-daemon ":app:assemble${{ inputs.build == 'release' && 'Release' || 'Debug' }}"
