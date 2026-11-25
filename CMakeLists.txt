@@ -376,6 +376,15 @@ else()
     set_source_files_properties(${TE_W2C_SOURCES} PROPERTIES COMPILE_OPTIONS "-O1")   # 39 MB of C: -O1 keeps the build minutes, not hours
 endif()
 add_dependencies(tegame te_seam)
+
+# TE_ANDROID_GAME_ONLY: for a cross target (the Android NDK) the game's library and nothing else. The engine, SDL2,
+# FFmpeg and the tools are host programs that the cross configure can't find, so the top level stops here: tegame
+# needs only the wasm2c output above, which the wasi-sdk builds on the host. .github/workflows/game-c-android.yml
+option(TE_ANDROID_GAME_ONLY "Only the game's library (tegame), for a cross target: the engine, SDL2, FFmpeg and the tools are skipped" OFF)
+if(TE_ANDROID_GAME_ONLY)
+    message(STATUS "TwinsanityEvolved: TE_ANDROID_GAME_ONLY -- tegame only (${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR})")
+    return()
+endif()
 if(WIN32)
     # The runtime's per-thread state stays PLAIN GLOBALS on the Windows lane as on macOS. CMake has no C99
     # flag for clang-cl (it compiles C17), so wasm-rt.h's own chain picks `_Thread_local`, and under `_MSC_VER` it would
