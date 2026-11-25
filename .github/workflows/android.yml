@@ -22,7 +22,7 @@ jobs:
       GAME_DATA_TOKEN: ${{ secrets.GAME_DATA_TOKEN }}
       GAME_DATA_REPO: ${{ vars.GAME_DATA_REPO }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Refuse the game's files
         run: python3 native/tools/check_game_data.py
@@ -52,7 +52,7 @@ jobs:
 
       - name: Get the game split from the private repo (if GAME_DATA_TOKEN is set)
         if: env.GAME_DATA_TOKEN != '' && env.GAME_DATA_REPO != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ vars.GAME_DATA_REPO }}
           token: ${{ secrets.GAME_DATA_TOKEN }}
