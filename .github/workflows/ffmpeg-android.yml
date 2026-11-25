@@ -1,0 +1,43 @@
+# FFmpeg 6.1.2 for arm64 Android (the engine's LGPL decoder recipe, cross-compiled with NDK r28c). Manual only.
+# Produces the static libraries the engine's Android configure links (artifact ffmpeg-arm64-android).
+name: FFmpeg (Android)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ffmpeg:
+    name: FFmpeg arm64 (Android)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the build tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q make nasm
+
+      - name: Install the NDK r28c
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r28c
+
+      - name: Build FFmpeg for arm64 Android
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+        run: bash tools/android/ffmpeg_android.sh "$GITHUB_WORKSPACE/ffmpeg-android" 2>&1 | tee ffmpeg-android.log
+
+      - name: Upload the libraries and the log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-arm64-android
+          path: |
+            ffmpeg-android/lib/*.a
+            ffmpeg-android/include
+            ffmpeg-android.log
+          if-no-files-found: warn
