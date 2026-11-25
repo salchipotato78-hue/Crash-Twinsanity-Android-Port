@@ -23,7 +23,7 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
 
     private lateinit var settings: AppSettings
     private lateinit var frame: AspectFrame
-    private lateinit var overlay: TouchOverlay
+    private lateinit var touchPad: TouchOverlay
     private lateinit var menuPanel: LinearLayout
     private lateinit var editPanel: LinearLayout
     private lateinit var notice: TextView
@@ -47,7 +47,7 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
             aspect = settings.screen.aspect
             surface.holder.addCallback(this@GameActivity)
         }
-        overlay = TouchOverlay(this).apply {
+        touchPad = TouchOverlay(this).apply {
             slots = settings.loadSlots(settings.profile)
             onPad = { bits, lx, ly -> NativeBridge.setPad(bits, lx, ly) }
             onEdited = { settings.saveSlots(settings.profile, slots) }
@@ -77,7 +77,7 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         setContentView(FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
             addView(frame, FrameLayout.LayoutParams(MATCH, MATCH))
-            addView(overlay, FrameLayout.LayoutParams(MATCH, MATCH))
+            addView(touchPad, FrameLayout.LayoutParams(MATCH, MATCH))
             addView(notice, FrameLayout.LayoutParams(MATCH, MATCH))
             addView(hamburger, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP or Gravity.START))
             addView(
@@ -119,7 +119,7 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
             visibility = View.GONE
             addView(menuItem(getString(R.string.menu_pause)) {
                 hideMenu()
-                overlay.pulse(Pad.START)
+                touchPad.pulse(Pad.START)
             })
             addView(menuItem(getString(R.string.menu_edit)) {
                 hideMenu()
@@ -146,10 +146,10 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
     }
 
     private fun cycleProfile() {
-        settings.saveSlots(settings.profile, overlay.slots)
+        settings.saveSlots(settings.profile, touchPad.slots)
         settings.profile = Profile.values()[(settings.profile.ordinal + 1) % Profile.values().size]
-        overlay.slots = settings.loadSlots(settings.profile)
-        overlay.selected = null
+        touchPad.slots = settings.loadSlots(settings.profile)
+        touchPad.selected = null
         profileButton.text = getString(R.string.menu_profile, settings.profile.label)
     }
 
@@ -172,17 +172,17 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         })
         addView(label(getString(R.string.edit_size)))
         sizeBar = seekBar { p ->
-            overlay.selected?.let {
+            touchPad.selected?.let {
                 it.scale = 0.5f + p / 100f * 1.5f
-                overlay.refresh()
+                touchPad.refresh()
             }
         }
         addView(sizeBar)
         addView(label(getString(R.string.edit_opacity)))
         alphaBar = seekBar { p ->
-            overlay.selected?.let {
+            touchPad.selected?.let {
                 it.alpha = 0.1f + p / 100f * 0.9f
-                overlay.refresh()
+                touchPad.refresh()
             }
         }
         addView(alphaBar)
@@ -208,7 +208,7 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
             override fun onStartTrackingTouch(bar: SeekBar) {}
 
             override fun onStopTrackingTouch(bar: SeekBar) {
-                overlay.commitEdit()
+                touchPad.commitEdit()
             }
         })
     }
@@ -221,16 +221,16 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
 
     private fun setEditing(on: Boolean) {
         hideMenu()
-        overlay.editing = on
+        touchPad.editing = on
         editPanel.visibility = if (on) View.VISIBLE else View.GONE
-        if (!on) overlay.commitEdit()
+        if (!on) touchPad.commitEdit()
     }
 
     private fun resetLayout() {
         settings.resetSlots(settings.profile)
-        overlay.selected = null
-        overlay.slots = settings.loadSlots(settings.profile)
-        overlay.refresh()
+        touchPad.selected = null
+        touchPad.slots = settings.loadSlots(settings.profile)
+        touchPad.refresh()
     }
 
     // ----- the engine and the surface -----------------------------------------------------------------------------
