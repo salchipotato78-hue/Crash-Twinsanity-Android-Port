@@ -60,6 +60,8 @@ endif()
 set(STUBS_CPP ${CMAKE_CURRENT_BINARY_DIR}/stubs.cpp)
 add_library(game OBJECT ${GAME_SOURCES} ${CORE_SOURCES} ${REUSED_PS2} ${PLATFORM_SOURCES} ${DATA_CPP})
 target_include_directories(game PRIVATE ${ROOT}/native/include ${ROOT}/include ${ROOT}/src/platform/native)
+# SDL's headers for the platform layer (audio.cpp includes SDL3/SDL.h): the objects need them, not only the library
+target_link_libraries(game PRIVATE SDL3::SDL3)
 target_compile_definitions(game PRIVATE TWIN_NATIVE TWIN_ANDROID=1)
 target_compile_options(game PRIVATE
     -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-strict-aliasing -fno-delete-null-pointer-checks -fwrapv

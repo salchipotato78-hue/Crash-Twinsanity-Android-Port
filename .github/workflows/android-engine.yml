@@ -69,7 +69,8 @@ jobs:
             -DCRASHTWIN_ROOT="$GITHUB_WORKSPACE" -DCRASHTWIN_PYTHON=python3 -DCRASHTWIN_HOST_CLANG=clang++-20 \
             -DCRASHTWIN_OUT="$GITHUB_WORKSPACE/build/engine-out" \
           | tee build-engine-configure.log
-          cmake --build build/engine-android -j"$(nproc)" 2>&1 | tee build-engine.log
+          # -k 0: keep going past failures, so one log shows every error
+          cmake --build build/engine-android -j"$(nproc)" -- -k 0 2>&1 | tee build-engine.log
 
       - name: Upload the library and the logs
         if: always()
