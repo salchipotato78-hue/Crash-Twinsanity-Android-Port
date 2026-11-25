@@ -1,5 +1,5 @@
-# Android APK (manual). Builds the app and the native library with the NDK. The engine itself is not linked yet
-# (android/README.md, hito 0). Nothing from the disc goes in: the disc is read on the device.
+# Android APK (manual). Builds FFmpeg (LGPL, arm64), the app and the native library with the NDK. The engine itself is
+# not linked yet (android/README.md, hito 0). Nothing from the disc goes in: the disc is read on the device.
 name: Android
 
 on:
@@ -58,12 +58,19 @@ jobs:
         with:
           ndk-version: r28c
 
+      - name: Build FFmpeg for arm64 (the movies' MPEG-2 decoder)
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+        run: |
+          bash tools/android/ffmpeg_android.sh "$GITHUB_WORKSPACE/ffmpeg-android" 2>&1 | tee ffmpeg-android.log
+
       - name: Build libtwinsanityevolved.so (arm64)
         run: |
           cmake -S android/native -B build/native-android \
             -DCMAKE_TOOLCHAIN_FILE="${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake" \
             -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 -DCMAKE_BUILD_TYPE=Release \
             -DCRASHTWIN_SDL_SRC="$GITHUB_WORKSPACE/build-sdl" \
+            -DCRASHTWIN_FFMPEG_DIR="$GITHUB_WORKSPACE/ffmpeg-android" \
             -DCRASHTWIN_OUT="$GITHUB_WORKSPACE/android/app/src/main/jniLibs/arm64-v8a"
           cmake --build build/native-android --config Release
           ls -la android/app/src/main/jniLibs/arm64-v8a/

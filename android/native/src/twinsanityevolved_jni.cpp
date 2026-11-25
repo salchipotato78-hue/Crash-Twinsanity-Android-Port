@@ -14,6 +14,10 @@
 
 #include "iso9660.h"
 
+#if defined(TE_HAVE_FFMPEG)
+#include <libavcodec/avcodec.h>
+#endif
+
 #define LOG_TAG "twinsanityevolved"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
@@ -39,6 +43,27 @@ bool ReadDisc(uint64_t offset, void* buffer, size_t length) {
         done += static_cast<size_t>(n);
     }
     return true;
+}
+
+// Checks that FFmpeg is linked and that its MPEG-2 video decoder (the movies' decoder) is in it: finds the decoder,
+// opens a context on it and frees the context again. Returns a line for the status and for logcat.
+std::string FfmpegCheck() {
+#if defined(TE_HAVE_FFMPEG)
+    const unsigned v = avcodec_version();
+    char version[48];
+    std::snprintf(version, sizeof(version), "FFmpeg %u.%u.%u", AV_VERSION_MAJOR(v), AV_VERSION_MINOR(v),
+                  AV_VERSION_MICRO(v));
+    const AVCodec* codec = avcodec_find_decoder(AV_CODEC_ID_MPEG2VIDEO);
+    if (!codec) return std::string(version) + ": sin decodificador MPEG-2";
+    AVCodecContext* ctx = avcodec_alloc_context3(codec);
+    if (!ctx) return std::string(version) + ": sin memoria para el decodificador";
+    const int ret = avcodec_open2(ctx, codec, nullptr);
+    avcodec_free_context(&ctx);
+    if (ret < 0) return std::string(version) + ": el decodificador MPEG-2 no abre";
+    return std::string(version) + ": decodificador MPEG-2 listo";
+#else
+    return "FFmpeg no enlazado";
+#endif
 }
 
 // Looks for the PAL executable and checks it starts with an ELF header.
@@ -85,6 +110,9 @@ Java_com_twinsanityevolved_app_NativeBridge_nativeStart(JNIEnv*, jclass, jint fd
     g_fd = fd;
     g_stop.store(false);
     CheckDisc();
+    const std::string ffmpeg = FfmpegCheck();
+    LOGI("%s", ffmpeg.c_str());
+    g_status += " " + ffmpeg + ".";
     return g_discOk ? JNI_TRUE : JNI_FALSE;
 }
 

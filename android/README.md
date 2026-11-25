@@ -11,6 +11,10 @@ este repositorio (wasm2c sobre NativeEE, SDL2 y GLES 3).
 - **Puente nativo (`native/`):** `libtwinsanityevolved.so` abre el disco por descriptor, comprueba `SLES_525.68` y pinta.
   Todavía no ejecuta el juego.
 
+- **FFmpeg (hito 0.5).** `tools/android/ffmpeg_android.sh` compila FFmpeg 6.1.2 estático (LGPL, arm64, API 26) con la
+  receta del motor. El workflow Android lo compila y lo enlaza con `-DCRASHTWIN_FFMPEG_DIR`; al abrir el disco, el
+  estado muestra la versión y si el decodificador MPEG-2 de las películas abre.
+
 ## Próximos hitos
 
 1. **Motor para NDK.** Generar el C de wasm2c (`tools/fetch_toolchain.sh`, sin disco) y compilar `tegame` y el runner
