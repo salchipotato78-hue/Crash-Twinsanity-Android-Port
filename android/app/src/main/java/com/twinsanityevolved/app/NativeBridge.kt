@@ -1,13 +1,13 @@
 package com.twinsanityevolved.app
 
-import android.view.Surface
-
 /**
- * The engine's entry points, in the JNI library "twinsanityevolved". Until that library is linked the app still runs:
- * every call goes through the wrappers below, which do nothing when the library is missing.
+ * The engine's entry points, in the JNI library "twinsanityevolved". SDL draws the picture (SDL_main runs the engine);
+ * these calls hand over the disc and the pad. Until the library is linked the app still runs: every call goes through
+ * the wrappers below, which do nothing when the library is missing.
  */
 object NativeBridge {
     val available: Boolean = try {
+        System.loadLibrary("SDL2")
         System.loadLibrary("twinsanityevolved")
         true
     } catch (e: UnsatisfiedLinkError) {
@@ -15,18 +15,12 @@ object NativeBridge {
     }
 
     @JvmStatic private external fun nativeStart(isoFd: Int): Boolean
-    @JvmStatic private external fun nativeSurface(surface: Surface?, width: Int, height: Int, aspect: Float)
     @JvmStatic private external fun nativeSetPad(bits: Int, lx: Float, ly: Float)
     @JvmStatic private external fun nativeStop()
     @JvmStatic private external fun nativeStatus(): String
 
-    /** Opens the disc (the file descriptor is handed over) and starts the engine. */
+    /** Opens the disc (the file descriptor is handed over) and checks it. */
     fun start(isoFd: Int): Boolean = available && nativeStart(isoFd)
-
-    /** Attaches the drawing surface (null detaches). aspect is the picture's real width/height: nothing is stretched. */
-    fun surface(surface: Surface?, width: Int, height: Int, aspect: Float) {
-        if (available) nativeSurface(surface, width, height, aspect)
-    }
 
     /** Pad state: buttons as Pad bits, the left stick from -1..1 (y up positive). */
     fun setPad(bits: Int, lx: Float, ly: Float) {

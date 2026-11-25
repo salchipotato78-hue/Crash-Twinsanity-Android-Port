@@ -1,13 +1,10 @@
 package com.twinsanityevolved.app
 
-import android.app.Activity
 import android.content.Intent
-import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
-import android.view.SurfaceHolder
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -17,12 +14,16 @@ import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
+import org.libsdl.app.SDLActivity
 import kotlin.math.roundToInt
 
-class GameActivity : Activity(), SurfaceHolder.Callback {
+/**
+ * The game. SDLActivity (SDL's own activity) owns the window and calls the engine's SDL_main on its thread; the touch
+ * overlay, the menu and the edit bars are added on top of it, so the touch layout is the same as before.
+ */
+class GameActivity : SDLActivity() {
 
     private lateinit var settings: AppSettings
-    private lateinit var frame: AspectFrame
     private lateinit var touchPad: TouchOverlay
     private lateinit var menuPanel: LinearLayout
     private lateinit var editPanel: LinearLayout
@@ -30,11 +31,13 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
     private lateinit var screenButton: Button
     private lateinit var sizeBar: SeekBar
     private lateinit var alphaBar: SeekBar
-    private var engineRunning = false
+    private var engineStarted = false
+
+    /** SDL loads libSDL2 first, then this library, which exports SDL_main (native/src/twinsanityevolved_jni.cpp). */
+    override fun getLibraries(): Array<String> = arrayOf("SDL2", "twinsanityevolved")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         if (Build.VERSION.SDK_INT >= 28) {
             window.attributes.layoutInDisplayCutoutMode =
@@ -42,10 +45,6 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         }
         settings = AppSettings(this)
 
-        frame = AspectFrame(this).apply {
-            aspect = settings.screen.aspect
-            surface.holder.addCallback(this@GameActivity)
-        }
         touchPad = TouchOverlay(this).apply {
             slots = settings.loadSlots()
             onPad = { bits, lx, ly -> NativeBridge.setPad(bits, lx, ly) }
@@ -73,21 +72,24 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         menuPanel = buildMenu()
         editPanel = buildEditPanel()
 
-        setContentView(FrameLayout(this).apply {
-            setBackgroundColor(Color.BLACK)
-            addView(frame, FrameLayout.LayoutParams(MATCH, MATCH))
-            addView(touchPad, FrameLayout.LayoutParams(MATCH, MATCH))
-            addView(notice, FrameLayout.LayoutParams(MATCH, MATCH))
-            addView(hamburger, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP or Gravity.START))
-            addView(
-                menuPanel,
-                FrameLayout.LayoutParams(dp(280), WRAP, Gravity.TOP or Gravity.START).apply {
-                    topMargin = dp(56)
-                    leftMargin = dp(8)
-                }
-            )
-            addView(editPanel, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.BOTTOM))
-        })
+        // Transparent: the engine's picture is underneath.
+        addContentView(
+            FrameLayout(this).apply {
+                addView(touchPad, FrameLayout.LayoutParams(MATCH, MATCH))
+                addView(notice, FrameLayout.LayoutParams(MATCH, MATCH))
+                addView(hamburger, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP or Gravity.START))
+                addView(
+                    menuPanel,
+                    FrameLayout.LayoutParams(dp(280), WRAP, Gravity.TOP or Gravity.START).apply {
+                        topMargin = dp(56)
+                        leftMargin = dp(8)
+                    }
+                )
+                addView(editPanel, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.BOTTOM))
+            },
+            FrameLayout.LayoutParams(MATCH, MATCH)
+        )
+        openDisc()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -144,7 +146,7 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
 
     private fun cycleScreen() {
         settings.screen = settings.screen.next()
-        frame.aspect = settings.screen.aspect
+        // The picture's aspect is the engine's (its Widescreen and display options); the choice is kept for it.
         screenButton.text = getString(R.string.menu_screen, settings.screen.label)
     }
 
@@ -222,19 +224,9 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         touchPad.refresh()
     }
 
-    // ----- the engine and the surface -----------------------------------------------------------------------------
+    // ----- the engine ---------------------------------------------------------------------------------------------
 
-    override fun surfaceCreated(holder: SurfaceHolder) = Unit
-
-    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-        NativeBridge.surface(holder.surface, width, height, frame.renderAspect())
-        if (!engineRunning) openDisc()
-    }
-
-    override fun surfaceDestroyed(holder: SurfaceHolder) {
-        NativeBridge.surface(null, 0, 0, 0f)
-    }
-
+    /** Checks the disc and hands its descriptor to the native side; SDL_main then runs the engine. */
     private fun openDisc() {
         val uri = RomStore.get(this)
         if (uri == null) {
@@ -254,7 +246,7 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
             showNotice(R.string.disc_open_failed)
             return
         }
-        engineRunning = NativeBridge.start(fd)
+        engineStarted = NativeBridge.start(fd)
         // Shows what the native side found on the disc (the executable, or why it failed).
         notice.text = NativeBridge.status()
         notice.visibility = View.VISIBLE
@@ -277,8 +269,8 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
     }
 
     override fun onDestroy() {
-        if (engineRunning) NativeBridge.stop()
-        engineRunning = false
+        if (engineStarted) NativeBridge.stop()
+        engineStarted = false
         super.onDestroy()
     }
 
