@@ -69,7 +69,19 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y -q clang-20
           # The split is copied into the tree for this run only: asm/, assets/ and SLES_525.68 are gitignored.
-          cp -r build-input/. .
+          # Find the split: SLES_525.68 at the top of the private repo, or inside one folder (a zip's top folder).
+          src=build-input
+          if [ ! -e build-input/SLES_525.68 ]; then
+            found=$(find build-input -maxdepth 2 -name SLES_525.68 | head -1)
+            if [ -z "$found" ]; then
+              echo "SLES_525.68 is not in the private repo. Its top level has:"
+              ls -la build-input
+              exit 1
+            fi
+            src=$(dirname "$found")
+          fi
+          # Copy everything except .git (the private repo's git data must not replace this repo's)
+          tar -C "$src" --exclude=.git -cf - . | tar -C . -xf -
           export TWIN_CLANG=clang++-20
           python3 native/tools/data_types.py
           python3 native/tools/convert_data.py
