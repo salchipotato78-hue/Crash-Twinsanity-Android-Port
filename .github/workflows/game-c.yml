@@ -1,0 +1,47 @@
+# The game's C (wasm2c) on Linux, as the first step of the Android engine. Manual only.
+# It fetches the pinned wasi-sdk and wabt, configures the engine for the host and builds the game's library (tegame):
+# the wasm2c output the Android build compiles next. No disc is needed: the game's sources are in the tree, the disc is
+# read on the device. The C is uploaded as an artifact.
+name: Game C (wasm2c)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  game-c:
+    name: tegame (host)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the build tools and the host libraries
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ninja-build libsdl2-dev libgl-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev
+
+      - name: Fetch the pinned toolchain (wasi-sdk 24.0, wabt 1.0.42)
+        run: bash tools/fetch_toolchain.sh
+
+      - name: Configure the engine for the host
+        run: cmake -S . -B build-w2c -G Ninja -DCMAKE_BUILD_TYPE=Release 2>&1 | tee configure.log
+
+      - name: Build the game's library (wasm2c output and its C)
+        run: cmake --build build-w2c --target tegame -- -k 0 2>&1 | tee build-tegame.log
+
+      - name: Collect the generated C
+        if: always()
+        run: |
+          mkdir -p game-c-out
+          find build-w2c -path '*w2c*' \( -name '*.c' -o -name '*.h' \) -print0 | tar --null -czf game-c-out/w2c-sources.tar.gz -T - 2>/dev/null || true
+          cp configure.log build-tegame.log game-c-out/ 2>/dev/null || true
+
+      - name: Upload the C and the logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: game-c-linux
+          path: game-c-out/
+          if-no-files-found: warn
