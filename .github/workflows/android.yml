@@ -1,5 +1,5 @@
 # Android: one job, run by hand (Actions > Android > Run workflow).
-# It refuses the game's files, downloads the game split from the GAME_DATA_URL secret if it's set, and builds the APK.
+# It refuses the game's files, fetches the game split from the private repo (GAME_DATA_REPO + GAME_DATA_TOKEN) if set, and builds the APK.
 name: Android
 
 on:
@@ -19,8 +19,8 @@ jobs:
     name: Android APK
     runs-on: ubuntu-latest
     env:
-      GAME_DATA_URL: ${{ secrets.GAME_DATA_URL }}
-      GAME_DATA_SHA256: ${{ vars.GAME_DATA_SHA256 }}
+      GAME_DATA_TOKEN: ${{ secrets.GAME_DATA_TOKEN }}
+      GAME_DATA_REPO: ${{ vars.GAME_DATA_REPO }}
     steps:
       - uses: actions/checkout@v4
 
@@ -36,9 +36,14 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Download the game split (secret GAME_DATA_URL, if set)
-        if: env.GAME_DATA_URL != ''
-        run: bash tools/fetch_game_data.sh
+      - name: Get the game split from the private repo (if GAME_DATA_TOKEN is set)
+        if: env.GAME_DATA_TOKEN != '' && env.GAME_DATA_REPO != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.GAME_DATA_REPO }}
+          token: ${{ secrets.GAME_DATA_TOKEN }}
+          path: build-input
+          persist-credentials: false
 
       # ubuntu-latest already has the Android SDK in ANDROID_HOME (no setup-android step: it fails on the runner's sdkmanager)
       - name: Build the APK
