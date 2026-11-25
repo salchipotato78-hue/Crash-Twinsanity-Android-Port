@@ -15,7 +15,11 @@
 #include "iso9660.h"
 
 #if defined(TE_HAVE_FFMPEG)
+// FFmpeg's headers have no extern "C" guards of their own: without this wrapper the calls below are C++-mangled and
+// the linker cannot find the C symbols in libavcodec.a.
+extern "C" {
 #include <libavcodec/avcodec.h>
+}
 #endif
 
 #define LOG_TAG "twinsanityevolved"
