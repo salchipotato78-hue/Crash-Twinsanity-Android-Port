@@ -1,0 +1,146 @@
+# .github/workflows/windows.yml -- the Windows build: configure, build, the unit tests and the staged zip, on every
+# push to main and every pull request.
+#
+#   the pinned wasm32 toolchain     tools/fetch_toolchain.ps1 (sha256 against tools/toolchain/PINS.sha256)
+#   SDL2 + FFmpeg + the GL headers  vcpkg in manifest mode (vcpkg.json), checked out at the manifest's builtin-baseline
+#   configure + build               `cmake --preset windows-clang-cl-release` (clang-cl through the engine's shim)
+#   unit tests                      `ctest --preset windows-clang-cl-release`; the runner has no GPU, so the tests run
+#                                   on Mesa's llvmpipe (OpenGL 4.5 in software) placed beside the test executables
+#   staged zip                      tools/ci/release_dist.ps1 -SkipBuild (exe + DLLs + BUILD-ID + notices, asset scan)
+#
+# The game itself is not run here: there is no disc image on a runner.
+name: TwinsanityEvolved Windows
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MESA_VERSION: 26.2.3
+  MESA_SHA256: 3f3613adb43cfd0f2e665ce2400b130c275f0b3317cb3a05566320a3a67589ed
+
+jobs:
+  windows-clang-cl:
+    name: windows-x64 (clang-cl, Ninja, vcpkg)
+    runs-on: windows-2022
+    timeout-minutes: 240
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg-cache
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Asset scan over the source tree
+        shell: bash
+        run: python tools/ci/asset_scan.py
+
+      - name: Python 3.12 (the clang-cl shim and the generators run under `python`)
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: vcpkg at the manifest's builtin-baseline
+        shell: pwsh
+        run: |
+          $baseline = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+          git clone --quiet https://github.com/microsoft/vcpkg.git "${{ github.workspace }}\vcpkg"
+          git -C "${{ github.workspace }}\vcpkg" checkout --quiet $baseline
+          & "${{ github.workspace }}\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+          New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+      - name: vcpkg binary cache (restore)
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+
+      - name: MSVC developer environment (clang-cl, lld-link, Ninja, the Windows SDK)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Tool versions
+        shell: pwsh
+        run: |
+          cmake --version | Select-Object -First 1
+          ninja --version
+          clang-cl --version | Select-Object -First 1
+          python --version
+
+      - name: Toolchain cache (the pinned downloads; the sha256 check runs on every fetch)
+        uses: actions/cache@v6
+        with:
+          path: |
+            tools/toolchain/*.tar.gz
+            tools/toolchain/*.whl
+          key: te-toolchain-windows-x64-${{ hashFiles('tools/toolchain/PINS.sha256') }}
+      - name: tools/fetch_toolchain.ps1
+        shell: pwsh
+        run: ./tools/fetch_toolchain.ps1
+
+      # VCPKG_ROOT is set on the step: the developer environment exports its own (Visual Studio's bundled vcpkg)
+      - name: Configure
+        shell: pwsh
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}\vcpkg
+        run: |
+          cmake --preset windows-clang-cl-release 2>&1 | Tee-Object -FilePath configure.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: vcpkg binary cache (save)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+
+      - name: Build
+        shell: bash
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}\vcpkg
+        run: |
+          set -o pipefail
+          cmake --build --preset windows-clang-cl-release -j 4 2>&1 | tee build.log
+          echo "build: $(grep -c 'warning' build.log || true) warnings"
+          test -f build-windows-release/twinsanityevolved.exe
+
+      - name: Mesa llvmpipe for the tests (software OpenGL; the runner has no GPU)
+        shell: pwsh
+        run: |
+          $archive = "mesa3d-$env:MESA_VERSION-release-msvc.7z"
+          Invoke-WebRequest -UseBasicParsing "https://github.com/pal1000/mesa-dist-win/releases/download/$env:MESA_VERSION/$archive" -OutFile $archive
+          $sha = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
+          if ($sha -ne $env:MESA_SHA256) { throw "mesa: sha256 $sha, pinned $env:MESA_SHA256" }
+          7z x -y -omesa $archive x64/opengl32.dll x64/libgallium_wgl.dll | Out-Null
+          $dirs = Get-ChildItem build-windows-release -Recurse -Filter *.exe | Where-Object { $_.Name -match '^(te_|test_)' } | ForEach-Object { $_.DirectoryName } | Sort-Object -Unique
+          foreach ($d in $dirs) { Copy-Item mesa/x64/opengl32.dll, mesa/x64/libgallium_wgl.dll $d; Write-Host "mesa -> $d" }
+      - name: Unit tests
+        shell: bash
+        env:
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          set -o pipefail
+          ctest --preset windows-clang-cl-release -j 4 2>&1 | tee ctest.log
+
+      - name: Stage, scan and zip (tools/ci/release_dist.ps1 -SkipBuild)
+        shell: pwsh
+        run: |
+          # the zip carries the player's GPU driver path, not the test-only Mesa copy
+          Remove-Item build-windows-release/opengl32.dll, build-windows-release/libgallium_wgl.dll -ErrorAction SilentlyContinue
+          ./tools/ci/release_dist.ps1 -SkipBuild -BuildDir "$PWD/build-windows-release" 2>&1 | Tee-Object -FilePath release_dist.log
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: twinsanityevolved-windows-x64
+          path: |
+            dist/twinsanityevolved-windows-x64.zip
+            dist/twinsanityevolved-windows-x64.zip.sha256
+            configure.log
+            build.log
+            ctest.log
+            release_dist.log
+          if-no-files-found: warn

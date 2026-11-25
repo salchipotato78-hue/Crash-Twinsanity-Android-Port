@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.crashtwinsanity.app"
+    namespace = "com.twinsanityevolved.app"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.crashtwinsanity.app"
+        applicationId = "com.twinsanityevolved.app"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

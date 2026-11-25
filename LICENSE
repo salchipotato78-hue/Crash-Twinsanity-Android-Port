@@ -1,12 +1,6 @@
-This licence covers what this repository adds to the code it imports: the changes and files of every commit after the first
-("Import HAB3X/Crash-Twinsanity-Mac at 7dbfd2d"). It doesn't cover the imported code (Smartkin's decompilation of Crash
-Twinsanity and HAB3X's Mac port, published without a licence: their authors keep their rights), the third-party code, libraries
-and fonts (each under its own licence or used with its authors' permission, see THIRD_PARTY_NOTICES.md), or the game
-(Activision's).
-
 MIT License
 
-Copyright (c) 2026 GioPixelGH
+Copyright (c) 2026 the TwinsanityEvolved contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,3 +19,11 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+This license covers the TwinsanityEvolved code in this repository (platform/,
+tools/, docs/, the build files). The `game/` and `engine/` trees carry their
+own licenses and terms: `game/` (the twinsanity-reversed decompilation,
+https://github.com/Smartkin/twinsanity-reversed) and `engine/` (NativeEE -- engine/LICENSE). No game data of any
+kind is part of this repository.

@@ -1,46 +1,43 @@
-# Third-party notices
+# TwinsanityEvolved — third-party notices
 
-What this repository and its releases contain that isn't this port's own work, under which licence, and where the licence's
-text is. Each release carries the same texts in its `licenses` folder, beside the program, with this list. The people behind
-them are thanked in the README's [Credits](README.md#credits).
+TwinsanityEvolved's own code is MIT licensed (`LICENSE`). This file names every third-party component in the
+repository and in the shipped artifact, its licence, and how it is used. A release folder (`dist/<platform>/`, staged
+by `tools/ci/release_dist.sh` / `tools/ci/release_dist.ps1`) carries its own generated `THIRD_PARTY_NOTICES.md` — the
+subset below that is actually linked into that binary, with the exact versions — and the licence texts in `licenses/`
+(from `engine/tools/dist/licenses/` and `FFmpeg-LICENSE.md`, pinned by `engine/tests/lint/lint_artifact_licenses.py`).
 
-## In the program
+The repository contains **no game data**: no textures, audio, models, movies or disc bytes. Crash Twinsanity is the
+property of its rights holders; you must own the game and supply your own disc image (`README.md`).
 
-| What | Licence | Its text |
-| --- | --- | --- |
-| [SDL 3](https://github.com/libsdl-org/SDL) (windows, input, sound) | zlib | `licenses/SDL3-LICENSE.txt` in the release (SDL isn't in this repository: the build takes it from SDL's own release) |
-| [glslang 16.6.0](https://github.com/KhronosGroup/glslang) by the Khronos Group (the Vulkan renderer's shaders made from the OpenGL renderer's while the game runs) | 3-Clause BSD, and for some parts 2-Clause BSD, MIT and Apache 2.0 | `licenses/glslang-LICENSE.txt` in the release (glslang isn't in this repository: the build takes it from its own release) |
-| [FFmpeg 9.0.2](https://ffmpeg.org/) (libavcodec and libavutil, built with only the MPEG-2 video decoder, for the game's movies) | LGPL 2.1 or later | [native/third_party/ffmpeg](native/third_party/ffmpeg) (how it's built, and the source it's built from) |
-| [SMAA](https://github.com/iryoku/smaa) by Jorge Jimenez, Jose I. Echevarria, Belen Masia, Fernando Navarro and Diego Gutierrez (the SMAA anti-aliasing) | MIT | [native/third_party/smaa/LICENSE.txt](native/third_party/smaa/LICENSE.txt) |
-| [stb_truetype](https://github.com/nothings/stb) by Sean Barrett (the options screen's text; one fix of ours, marked in the file) | public domain or MIT | [native/third_party/stb/LICENSE.txt](native/third_party/stb/LICENSE.txt) |
-| [TwinsanityEvolved](https://github.com/menaman123/TwinsanityEvolved)'s engine, NativeEE (the disc image's CRC-32 and SHA-1, a text bank's language, the mods' zips and their decompression) | MIT | [native/third_party/twinsanityevolved/LICENSE-NativeEE.txt](native/third_party/twinsanityevolved/LICENSE-NativeEE.txt) |
-| TwinsanityEvolved's region map tool (native/tools/region_map.py: where the North American disc's executable has each piece of the PAL one's data) | MIT | [native/third_party/twinsanityevolved/LICENSE-TwinsanityEvolved.txt](native/third_party/twinsanityevolved/LICENSE-TwinsanityEvolved.txt) |
-| TwinsanityEvolved's cutscene skip and its census of the game's cutscenes, used with menaman123's permission ([TwinsanityEvolved#19](https://github.com/menaman123/TwinsanityEvolved/issues/19)) | MIT | [native/third_party/twinsanityevolved/LICENSE-TwinsanityEvolved.txt](native/third_party/twinsanityevolved/LICENSE-TwinsanityEvolved.txt) |
+## The two vendored trees
 
-[native/third_party/twinsanityevolved/README.md](native/third_party/twinsanityevolved/README.md) lists each file taken from
-TwinsanityEvolved and the file of ours it became; every one keeps its copyright notice.
+| Tree | Licence | |
+|---|---|---|
+| `game/` — the twinsanity-reversed decompilation | [twinsanity-reversed](https://github.com/Smartkin/twinsanity-reversed) | compiled to wasm32 and into the binary |
+| `engine/` — NativeEE | MIT — `engine/LICENSE` | the runtime the game runs on |
 
-## Used with their authors' permission
+## Compiled into the shipped binary
 
-| What | Licence | The permission |
-| --- | --- | --- |
-| [Crash Twinsanity Improved](https://github.com/AlexMollard/Crash-Twinsanity-Improved) by AlexMollard, a mod of the PS2 game: the optional bug fixes (its `mod/elf_patches.txt` and `mod/levels/*.ops`, remade in C++ in `src/platform/native/fixes.cpp` and `src/platform/native/levelrecipes.cpp`) and the cutscene skip's prompt (its `mod/text.txt`) | none: all rights stay with its authors | AlexMollard's, on [Crash-Twinsanity-Improved#5](https://github.com/AlexMollard/Crash-Twinsanity-Improved/issues/5) (2026-11-10): "feel free to use anything you find in this repo" |
+| Component | Version | Licence | Where / how |
+|---|---|---|---|
+| SDL2 | `release-2.30.9` (`engine/cmake/Sdl2Dependency.cmake`) | zlib — `engine/tools/dist/licenses/SDL2-LICENSE.txt` | built from source and linked statically by the `*-dist` presets; the system package (Homebrew / distribution / vcpkg DLL) in the other presets |
+| FFmpeg — libavcodec, libavutil, libswscale | `n6.1.2` (`engine/tools/ci/ffmpeg_static.sh`) | LGPL v2.1 or later — `engine/tools/dist/licenses/FFmpeg-COPYING.LGPLv2.1.txt`, per-component terms in `FFmpeg-LICENSE.md` | the MPEG-1/2 movie decoder. Built with `--disable-gpl --disable-nonfree --disable-version3` and only the mpeg1/mpeg2 decoders, the mpegvideo parser and colour conversion; linked statically on macOS / Linux and in the PlayStation Vita's eboot (the same release and recipe cross-compiled by `tools/vita/ffmpeg_vita.sh`), bundled as DLLs on Windows. LGPL §6: this repository is the complete source of the program and the recipe that rebuilds the library |
+| Dear ImGui | `v1.91.9b` | MIT — `engine/app/gui/third_party/imgui/LICENSE.txt` | the engine's developer overlay. Its `imstb_*.h` headers carry their own public-domain / MIT notices |
+| gl3w-derived OpenGL loader (`imgui_impl_opengl3_loader.h`) | part of the ImGui copy | public domain (Unlicense-style) — `engine/tools/dist/licenses/imgl3w-UNLICENSE.txt` | used by the ImGui overlay only |
+| GCC libstdc++ / libgcc (Linux artifact only) | the toolchain's | GPL v3 with the GCC Runtime Library Exception 3.1 — `engine/tools/dist/licenses/GCC-COPYING3.txt`, `GCC-RUNTIME-LIBRARY-EXCEPTION.txt` | linked statically so the folder runs without matching distribution packages |
 
-The 21:9 shape is TechieSaru's fix, found in the mod's PCSX2 patches: the 21:9 width (2.333) written where the game keeps
-16:9's. TechieSaru is credited in the README and in the program's Credits page, and wasn't asked separately.
+The launcher (`engine/app/launcher`) links Qt 6 dynamically (LGPL v3); its release folder carries Qt's notices.
 
-## Fonts
+## Build-time tools (nothing of them is in the shipped binary)
 
-| What | Licence | Its text |
-| --- | --- | --- |
-| [Luckiest Guy](https://fonts.google.com/specimen/Luckiest+Guy) by Astigmatic | Apache 2.0 | [native/third_party/fonts/LICENSE-LuckiestGuy.txt](native/third_party/fonts/LICENSE-LuckiestGuy.txt) |
-| [Fredoka](https://fonts.google.com/specimen/Fredoka) by the Fredoka Project Authors | SIL Open Font Licence 1.1 | [native/third_party/fonts/OFL-Fredoka.txt](native/third_party/fonts/OFL-Fredoka.txt) |
+| Component | Licence | Where / how |
+|---|---|---|
+| wasi-sdk, wabt (wasm2c) | Apache 2.0 with LLVM exception / Apache 2.0 | the pinned toolchain `tools/fetch_toolchain.sh` downloads; wabt's wasm-rt runtime sources are compiled into the binary from that download |
+| rabbitizer (MIPS disassembler) | MIT — `engine/third_party/rabbitizer/LICENSE` | the engine's recompilers decode instructions with it at build time |
+| ELFIO | MIT — `engine/third_party/elfio/LICENSE.txt` | the engine's recompilers read the ELF / IRX with it at build time |
+| JSON for Modern C++ (nlohmann/json, `engine/tools/recompiler_v2/include/json.hpp`) | MIT — the notice at the top of the header | the recompiler's symbol / stub inputs |
 
-## The game's code
+## Not bundled
 
-The game's code is [Smartkin's decompilation](https://github.com/Smartkin/twinsanity-reversed), on
-[HAB3X's port for Mac](https://github.com/HAB3X/Crash-Twinsanity-Mac). Both are published without a licence, so all their
-rights stay with their authors: the README's [Licence](README.md#licence) and [LICENSE](LICENSE) say how this repository
-handles that. This repository's own changes are under the MIT licence ([LICENSE](LICENSE)).
-
-No part of the game itself (its executable, data or disc image) is in this repository or in a release.
+- The operating system's own libraries (OpenGL, the C/C++ runtime, the audio and window-system back ends SDL2 loads)
+  are the user's own.

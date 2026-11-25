@@ -1,0 +1,353 @@
+# .github/workflows/release.yml -- a TwinsanityEvolved release: on a version tag (or by hand), every file a player
+# downloads, built by the same scripts and presets a developer runs locally, attached to ONE draft GitHub release:
+#
+#   twinsanityevolved-<tag>-<target>.zip   the game: macos-arm64, macos-x86_64, linux-x86_64, linux-aarch64, windows-x64
+#   twinsanityevolved-<tag>-vita.vpk       the PS Vita package (the game's code compiled natively for the console)
+#   twinsanityevolved-launcher-*           the launcher: windows-x64.zip, macos-arm64.dmg, linux-x86_64.AppImage, and
+#                                          <tag>-macos-arm64.zip (the bundle zipped: what a running launcher replaces
+#                                          itself with on macOS; the Windows zip and the AppImage serve both purposes)
+#   SHA256SUMS                             every file above (the launcher installs nothing whose name is not in it)
+#
+#   build     tools/ci/release_dist.sh (macOS / Linux: the pinned wasm32 toolchain, the engine's static LGPL FFmpeg and
+#             static SDL2, configure + build, stage dist/<target>/ with the mod tool and mods/arabic, asset scan, zip) and
+#             tools/ci/release_dist.ps1 (Windows: clang-cl + Ninja through the preset, SDL2 + FFmpeg from vcpkg.json, the
+#             unit tests on Mesa's llvmpipe, the same staging)
+#   vita      in the vitasdk/vitasdk image (pinned by digest): the vita-release preset -- the game's code compiled natively
+#             for the console's ARM processor by the SDK's GCC, FFmpeg cross-compiled with tools/vita/ffmpeg_vita.sh from
+#             the release tarball pinned by URL + sha256 -- then the .vpk's content checked (the program, its package
+#             metadata and the shipped shader set only) and the asset scan over everything in it but the program
+#   launcher  .github/workflows/launcher.yml, called here (tools/ci/release_launcher.ps1 / .sh / _linux.sh)
+#   release   SHA256SUMS over everything that was built, the notes (RELEASE-NOTES.txt, then the tag's file table and the
+#             checksums; a target that failed is named as missing and the others are still attached), the tag's DRAFT
+#             release created or updated with `gh`. It is published by hand once checked (`gh release edit <tag>
+#             --draft=false`); the launcher only installs published releases.
+#
+# Every artifact is the port's code + the engine + the decompilation compiled: NO game data (tools/ci/asset_scan.py over
+# every staged folder and the package; the player supplies their own disc image at run time). The engine (engine/) and
+# the decompilation (game/) are trees of this repository, so a plain checkout holds everything the build needs.
+#
+# Local validation: actionlint .github/workflows/*.yml (with shellcheck); the scripts: bash -n, and
+# the local dry runs of each job.
+name: TwinsanityEvolved release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  TE_MIN_FREE_GB: 3
+
+jobs:
+  guard:
+    name: asset scan (tree) + no-codenames lint + script syntax
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Asset scan over the tree (zero findings)
+        run: python3 tools/ci/asset_scan.py
+      - name: No developer vocabulary where a player reads (zero findings)
+        run: python3 tools/ci/no_codenames_lint.py
+      - name: Script syntax (every shell and Python script under tools/)
+        run: |
+          set -euo pipefail
+          git ls-files 'tools/*.sh' 'tools/**/*.sh' | while read -r f; do bash -n "$f"; done
+          git ls-files 'tools/*.py' 'tools/**/*.py' | PYTHONPYCACHEPREFIX="$RUNNER_TEMP/pycache" xargs python3 -m py_compile
+      - name: The release notes are there
+        run: test -s RELEASE-NOTES.txt
+
+  build:
+    name: ${{ matrix.target }}
+    needs: guard
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-14,         target: macos-arm64,   platform: macos,   jobs: 3 }
+          - { os: macos-15-intel,   target: macos-x86_64,  platform: macos,   jobs: 3 }
+          - { os: ubuntu-24.04,     target: linux-x86_64,  platform: linux,   jobs: 3 }
+          - { os: ubuntu-24.04-arm, target: linux-aarch64, platform: linux,   jobs: 3 }
+          - { os: windows-2022,     target: windows-x64,   platform: windows, jobs: 3 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg-cache
+      MESA_VERSION: 26.2.3
+      MESA_SHA256: 3f3613adb43cfd0f2e665ce2400b130c275f0b3317cb3a05566320a3a67589ed
+    steps:
+      - uses: actions/checkout@v7
+
+      # --- dependencies per host --------------------------------------------------------------
+      - name: Dependencies (macOS -- Homebrew; FFmpeg and SDL2 are built statically by the script)
+        if: matrix.platform == 'macos'
+        run: brew install cmake ninja nasm pkg-config
+
+      - name: Dependencies (Linux -- the engine's package list + the toolchain fetch)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          # shellcheck disable=SC2046
+          sudo apt-get install -y --no-install-recommends $(grep -v '^#' engine/tools/ci/linux_packages.txt | xargs) curl unzip nasm
+      - name: Toolchain cache (wasi-sdk, wabt, libclang -- pinned tarballs)
+        if: matrix.platform != 'windows'
+        uses: actions/cache@v6
+        with:
+          path: |
+            tools/toolchain/*.tar.gz
+            tools/toolchain/*.tar.xz
+            tools/toolchain/*.whl
+          key: te-toolchain-${{ matrix.target }}-${{ hashFiles('tools/toolchain/PINS.sha256') }}
+
+      - name: Dependencies (Windows -- Python for the shim)
+        if: matrix.platform == 'windows'
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: vcpkg at the manifest's builtin-baseline
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $baseline = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+          git clone --quiet https://github.com/microsoft/vcpkg.git "${{ github.workspace }}/vcpkg"
+          git -C "${{ github.workspace }}/vcpkg" checkout --quiet $baseline
+          & "${{ github.workspace }}/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
+          New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+      - name: vcpkg binary cache (restore)
+        if: matrix.platform == 'windows'
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+      - name: MSVC developer environment (clang-cl, Ninja, the Windows SDK on PATH)
+        if: matrix.platform == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # --- build + stage through the scripts --------------------------------------------------
+      - name: release_dist.sh (toolchain, static deps, build, stage, scan, zip)
+        if: matrix.platform != 'windows'
+        shell: bash
+        run: tools/ci/release_dist.sh --jobs ${{ matrix.jobs }} 2>&1 | tee release_dist.log
+
+      # Windows: configure + build through the preset (VCPKG_ROOT on the step: the developer environment exports its
+      # own), the unit tests on Mesa's llvmpipe, then the same staging as the other platforms
+      - name: Windows -- toolchain, configure, build
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+        run: |
+          ./tools/fetch_toolchain.ps1
+          cmake --preset windows-clang-cl-release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build --preset windows-clang-cl-release -j ${{ matrix.jobs }}
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Windows -- unit tests on Mesa llvmpipe
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        env:
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          $archive = "mesa3d-$env:MESA_VERSION-release-msvc.7z"
+          Invoke-WebRequest -UseBasicParsing "https://github.com/pal1000/mesa-dist-win/releases/download/$env:MESA_VERSION/$archive" -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne $env:MESA_SHA256) { throw "mesa: sha256 mismatch" }
+          7z x -y -omesa $archive x64/opengl32.dll x64/libgallium_wgl.dll | Out-Null
+          $dirs = Get-ChildItem build-windows-release -Recurse -Filter *.exe | Where-Object { $_.Name -match '^(te_|test_)' } | ForEach-Object { $_.DirectoryName } | Sort-Object -Unique
+          foreach ($d in $dirs) { Copy-Item mesa/x64/opengl32.dll, mesa/x64/libgallium_wgl.dll $d }
+          ctest --preset windows-clang-cl-release -j ${{ matrix.jobs }}
+          $rc = $LASTEXITCODE
+          foreach ($d in $dirs) { Remove-Item "$d/opengl32.dll", "$d/libgallium_wgl.dll" -ErrorAction SilentlyContinue }
+          if ($rc -ne 0) { exit $rc }
+      - name: Windows -- stage, scan, zip
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: ./tools/ci/release_dist.ps1 -SkipBuild -BuildDir "$PWD/build-windows-release" 2>&1 | Tee-Object -FilePath release_dist.log
+      - name: vcpkg binary cache (save)
+        if: matrix.platform == 'windows' && always()
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+
+      - name: Asset scan over the staged folder (again, on the runner)
+        if: matrix.platform != 'windows'
+        shell: bash
+        run: python3 tools/ci/asset_scan.py dist/${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: twinsanityevolved-${{ matrix.target }}
+          path: |
+            dist/twinsanityevolved-${{ matrix.target }}.zip
+            dist/twinsanityevolved-${{ matrix.target }}.zip.sha256
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: build-log-${{ matrix.target }}
+          path: release_dist.log
+          if-no-files-found: ignore
+
+  # The PS Vita package, in the VitaSDK's own image: Ubuntu 24.04 with cmake, ninja, python3, curl, git, xz and the SDK
+  # with its packages at /usr/local/vitasdk (VITASDK). The image is pinned by digest: vitasdk/vitasdk:2026.08-20261027 =
+  # the 2026.08 SDK series, the series of the local SDK the package was tested with (vitasdk-core 2026.08.1,
+  # arm-vita-eabi-gcc 15.2.0). The whole eboot is cross-compiled, the game's code included: the vita-release preset
+  # compiles the decompilation natively for the console's ARM processor (tools/te_cxx_arm.py, cmake/native_lane.cmake),
+  # so the pinned wasm32 toolchain is not needed here (vita-module-release, the wasm2c build kept for A/B, would need it);
+  # the build's te_ffmpeg_vita step cross-compiles FFmpeg (tools/vita/ffmpeg_vita.sh: the release tarball by its pinned
+  # URL, checked against its sha256) -- the same commands as a local Vita build.
+  vita:
+    name: vita
+    needs: guard
+    runs-on: ubuntu-24.04
+    container: vitasdk/vitasdk:2026.08-20261027@sha256:61c173463b3d10d71464b6fc591f1fe1018736bf2e321e6852db06612eb05b07
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+      # the cross-compiled FFmpeg (~3 min): kept between tags by its recipe; ffmpeg_vita.sh still checks the restored
+      # prefix's record (version, sha256, every configure argument) and rebuilds when it differs
+      - name: FFmpeg for the Vita (cache)
+        uses: actions/cache@v6
+        with:
+          path: build-vita-release/third_party/ffmpeg
+          key: te-ffmpeg-vita-${{ hashFiles('tools/vita/ffmpeg_vita.sh', 'engine/tools/ci/ffmpeg_static.sh') }}
+      - name: Configure + build the .vpk (the vita-release preset)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --preset vita-release
+          cmake --build --preset vita-release -j 4
+      # the package: the program (eboot.bin), the Vita's metadata (sce_sys/) and the port's own GPU programs, compiled
+      # once (shaders/<key>.tegxp: tools/vita/shader_cache_seed.sh) -- nothing else; the asset scan over all but the program
+      - name: The .vpk holds the program, its metadata and the port's compiled shaders only (asset scan over the rest)
+        shell: bash
+        run: |
+          python3 - <<'EOF'
+          import re, subprocess, sys, tempfile, zipfile
+          for vpk in ("build-vita-release/twinsanityevolved.vpk",):
+              z = zipfile.ZipFile(vpk)
+              names = sorted(n for n in z.namelist() if not n.endswith("/"))
+              print("%s: %d entries" % (vpk, len(names)))
+              allowed = re.compile(r"^(eboot\.bin|sce_sys/[A-Za-z0-9_./-]+|shaders/[0-9A-F]{16}\.tegxp)$")
+              extra = [n for n in names if not allowed.match(n)]
+              if extra or "eboot.bin" not in names or "sce_sys/param.sfo" not in names:
+                  sys.exit("%s is not the program, its metadata and its shaders: extra %s" % (vpk, extra))
+              d = tempfile.mkdtemp()
+              for n in names:
+                  if n != "eboot.bin":
+                      z.extract(n, d)
+              rc = subprocess.call([sys.executable, "tools/ci/asset_scan.py", d])
+              if rc:
+                  sys.exit(rc)
+          EOF
+      - name: Stage
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp build-vita-release/twinsanityevolved.vpk dist/twinsanityevolved-vita.vpk
+          (cd dist && sha256sum twinsanityevolved-vita.vpk | tee twinsanityevolved-vita.sha256)
+      - uses: actions/upload-artifact@v7
+        with:
+          name: twinsanityevolved-vita
+          path: |
+            dist/twinsanityevolved-vita.vpk
+            dist/twinsanityevolved-vita.sha256
+          if-no-files-found: error
+
+  # The launchers (Windows zip, macOS .dmg, Linux AppImage): the launcher workflow's own jobs, run as part of this one so
+  # that the release job sees every file and writes ONE SHA256SUMS (launcher.yml on its own builds them on pushes and pull
+  # requests)
+  launcher:
+    needs: guard
+    permissions:
+      contents: read
+    uses: ./.github/workflows/launcher.yml
+
+  release:
+    name: SHA256SUMS + the tag's draft GitHub release
+    needs: [build, vita, launcher]
+    # the files that built are attached even when another target failed (the notes name the missing ones)
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: RELEASE-NOTES.txt
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: twinsanityevolved-*
+          path: artifacts
+          merge-multiple: true
+      - name: The files, SHA256SUMS and the notes (RELEASE-NOTES.txt, the files of this tag, the checksums)
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          mkdir -p release
+          missing=""
+          rows=""
+          row() { rows="${rows}| $1 | \`$2\` |"$'\n'; }
+          take() { # artifact-file release-name label
+            if [ -f "artifacts/$1" ]; then mv "artifacts/$1" "release/$2"; row "$3" "$2"; else missing="$missing $2"; fi
+          }
+          take twinsanityevolved-windows-x64.zip   "twinsanityevolved-${tag}-windows-x64.zip"   "Windows 10 / 11 (64-bit)"
+          take twinsanityevolved-macos-arm64.zip   "twinsanityevolved-${tag}-macos-arm64.zip"   "macOS, Apple silicon"
+          take twinsanityevolved-macos-x86_64.zip  "twinsanityevolved-${tag}-macos-x86_64.zip"  "macOS, Intel"
+          take twinsanityevolved-linux-x86_64.zip  "twinsanityevolved-${tag}-linux-x86_64.zip"  "Linux x86_64"
+          take twinsanityevolved-linux-aarch64.zip "twinsanityevolved-${tag}-linux-aarch64.zip" "Linux ARM64"
+          take twinsanityevolved-vita.vpk          "twinsanityevolved-${tag}-vita.vpk"          "PS Vita (install with VitaShell)"
+          take twinsanityevolved-launcher-windows-x64.zip      twinsanityevolved-launcher-windows-x64.zip      "The launcher for Windows"
+          take twinsanityevolved-launcher-macos-arm64.dmg      twinsanityevolved-launcher-macos-arm64.dmg      "The launcher for macOS (Apple silicon)"
+          take twinsanityevolved-launcher-linux-x86_64.AppImage twinsanityevolved-launcher-linux-x86_64.AppImage "The launcher for Linux x86_64"
+          # the macOS launcher's own update: the zip carries the version the launcher was stamped
+          # with (git describe = the tag on a tag build); it is attached under the tag's name, the name title.json expects
+          shopt -s nullglob
+          mac_update=(artifacts/twinsanityevolved-launcher-*-macos-arm64.zip)
+          shopt -u nullglob
+          take "$(basename "${mac_update[0]:-none}")" "twinsanityevolved-launcher-${tag}-macos-arm64.zip" "The launcher for macOS (Apple silicon), the file it updates itself from"
+          # the launcher installs nothing whose name is not in this file
+          (
+            cd release
+            shopt -s nullglob
+            files=(./*.zip ./*.vpk ./*.dmg ./*.AppImage)
+            [ "${#files[@]}" -gt 0 ] || { echo "release: no target produced its file"; exit 1; }
+            sha256sum "${files[@]}" > SHA256SUMS
+            cat SHA256SUMS
+          )
+          {
+            cat RELEASE-NOTES.txt
+            printf '\n## The files of %s\n\n| For | File |\n|---|---|\n%s' "$tag" "$rows"
+            printf '\nNo file of this release contains game data: every one passes the repository'"'"'s asset scan.\n'
+            printf '\n### Checksums (SHA256SUMS)\n\n| File | SHA-256 |\n|---|---|\n'
+            # shellcheck disable=SC2016  # the backticks are the table's code marks, not a command
+            while read -r sha file; do f="${file#\*}"; printf '| %s | `%s` |\n' "${f#./}" "$sha"; done < release/SHA256SUMS
+            if [ -n "$missing" ]; then printf '\nNot in this release (the build did not produce it):%s.\n' "$missing"; fi
+          } > release/NOTES.md
+          cat release/NOTES.md
+      # ONE draft release per tag: created here when it is not there yet (`gh release view` finds a draft by its tag), else
+      # its notes and files replaced. Published by hand once checked: gh release edit <tag> --draft=false.
+      - name: The tag's draft release -- its notes and the files
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          pre=()
+          case "$tag" in *-*) pre=(--prerelease) ;; esac
+          if gh release view "$tag" > /dev/null 2>&1; then
+            gh release edit "$tag" --notes-file release/NOTES.md
+          else
+            gh release create "$tag" --draft "${pre[@]}" --verify-tag --title "TwinsanityEvolved $tag" --notes-file release/NOTES.md
+          fi
+          shopt -s nullglob
+          gh release upload "$tag" --clobber release/*.zip release/*.vpk release/*.dmg release/*.AppImage release/SHA256SUMS
+          gh release view "$tag" --json isDraft,assets --jq '"draft: \(.isDraft); assets: \([.assets[].name] | join(", "))"'

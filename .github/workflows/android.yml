@@ -1,5 +1,5 @@
-# Android: one job, run by hand (Actions > Android > Run workflow).
-# It refuses the game's files, fetches the game split from the private repo (GAME_DATA_REPO + GAME_DATA_TOKEN) if set, and builds the APK.
+# Android APK (manual). Builds the app and the native library with the NDK. The engine itself is not linked yet
+# (android/README.md, hito 0). Nothing from the disc goes in: the disc is read on the device.
 name: Android
 
 on:
@@ -18,14 +18,14 @@ jobs:
   android:
     name: Android APK
     runs-on: ubuntu-latest
-    env:
-      GAME_DATA_TOKEN: ${{ secrets.GAME_DATA_TOKEN }}
-      GAME_DATA_REPO: ${{ vars.GAME_DATA_REPO }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Refuse the game's files
-        run: python3 native/tools/check_game_data.py
+      - name: Refuse disc images in the tree
+        run: |
+          if find . -path ./.git -prune -o \( -iname '*.iso' -o -iname '*.bin' -o -iname '*.img' -o -iname '*.cue' \) -print | grep -q .; then
+            echo "A disc image is in the tree:"; find . -path ./.git -prune -o \( -iname '*.iso' -o -iname '*.bin' -o -iname '*.img' -o -iname '*.cue' \) -print; exit 1
+          fi
 
       - uses: actions/setup-java@v4
         with:
@@ -36,56 +36,25 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Test the disc reader (host build, no Android)
+      - name: Test the disc reader (host build)
         run: |
           g++ -std=c++17 -Wall -Wextra android/native/test/test_iso9660.cpp android/native/src/iso9660.cpp -o /tmp/test_iso9660
           /tmp/test_iso9660
 
-      - name: Build the native library (libcrashtwin.so, arm64) with the NDK
+      - name: Install the NDK r28c
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r28c
+
+      - name: Build libtwinsanityevolved.so (arm64)
         run: |
           cmake -S android/native -B build/native-android \
-            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DCMAKE_TOOLCHAIN_FILE="${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake" \
             -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 -DCMAKE_BUILD_TYPE=Release \
             -DCRASHTWIN_OUT="$GITHUB_WORKSPACE/android/app/src/main/jniLibs/arm64-v8a"
           cmake --build build/native-android --config Release
           ls -la android/app/src/main/jniLibs/arm64-v8a/
-
-      - name: Get the game split from the private repo (if GAME_DATA_TOKEN is set)
-        if: env.GAME_DATA_TOKEN != '' && env.GAME_DATA_REPO != ''
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ vars.GAME_DATA_REPO }}
-          token: ${{ secrets.GAME_DATA_TOKEN }}
-          path: build-input
-          persist-credentials: false
-
-      # ubuntu-latest already has the Android SDK in ANDROID_HOME (no setup-android step: it fails on the runner's sdkmanager)
-      - name: Generate the game's data (data.cpp) from the split (needs GAME_DATA_TOKEN)
-        if: env.GAME_DATA_TOKEN != '' && env.GAME_DATA_REPO != ''
-        run: |
-          # The PS2 toolchain (ps2dev's release) goes to /usr/local/ps2dev, where the engine's tools look for it.
-          curl -fL --retry 3 -o /tmp/ps2dev.tar.gz https://github.com/ps2dev/ps2dev/releases/download/latest/ps2dev-ubuntu-latest.tar.gz
-          sudo tar -xzf /tmp/ps2dev.tar.gz -C /usr/local
-          sudo apt-get update -q
-          sudo apt-get install -y -q clang-20
-          # The split is copied into the tree for this run only: asm/, assets/ and SLES_525.68 are gitignored.
-          # Find the split: SLES_525.68 at the top of the private repo, or inside one folder (a zip's top folder).
-          src=build-input
-          if [ ! -e build-input/SLES_525.68 ]; then
-            found=$(find build-input -maxdepth 2 -name SLES_525.68 | head -1)
-            if [ -z "$found" ]; then
-              echo "SLES_525.68 is not in the private repo. Its top level has:"
-              ls -la build-input
-              exit 1
-            fi
-            src=$(dirname "$found")
-          fi
-          # Copy everything except .git (the private repo's git data must not replace this repo's)
-          tar -C "$src" --exclude=.git -cf - . | tar -C . -xf -
-          export TWIN_CLANG=clang++-20
-          python3 native/tools/data_types.py
-          python3 native/tools/convert_data.py
-          ls -la build/native/data.cpp
 
       - name: Build the APK
         working-directory: android

@@ -1,47 +1,108 @@
-# Made from the retail executable, which isn't ours to share: the executable itself (SLES_525.68 from the PAL disc), what
-# tools/split.py splits it into, and the Ghidra project's export symbol_addrs.txt is made from (tools/make_symbols.py)
-/SLES_525.68
+# --- build output (reproducible; prune when disk < 15 GB) ---
+/build/
+/build-*/
+/dist/
+/out/
+/cmake-build-*/
+compile_commands.json
+*.o
+*.a
+*.wasm
+*.wat
+*.ll
+
+# --- pinned toolchain, fetched by tools/fetch_toolchain.sh (never committed) ---
+/tools/toolchain/*
+!/tools/toolchain/README.md
+!/tools/toolchain/PINS.sha256
+
+# --- GAME DATA OF ANY KIND: never in this tree (tools/ci/asset_scan.py) ---
+*.iso
+*.ISO
+*.bin
+*.BIN
+*.cue
+*.img
+*.IMG
+*.elf
+*.ELF
+*.irx
+*.IRX
+*.ps2st
+*.p2s
+*.mcd
+*.ps2
+*.psu
+# the title executables: the digit/dot shape spelled out -- git matches case-insensitively on macOS, so `SLUS_*` would
+# swallow the engine's games/slus_<serial>_<slug>/ tree
+SLUS_???.??
+SLES_???.??
+SCUS_???.??
+SCES_???.??
+SLUS_???.??;1
+SLES_???.??;1
+SYSTEM.CNF
+IOPRP???.IMG
+*.PSS
+*.pss
+*.VAG
+*.vag
+*.BD
+*.BH
+*.MB
+*.MH
+*.RM2
+*.SM2
+*.PSF
+*.psf
+*.TGA
+*.tga
+*.DDS
+*.dds
+*.PNG
+*.png
+# the one picture exemption (tools/ci/asset_scan.sh): the launcher's own window for README, nothing of the disc
+!/docs/launcher/screenshots/launcher-*.png
+*.jpg
+*.jpeg
+*.wav
+*.mp3
+*.ogg
+*.mp4
+*.avi
+*.mov
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+*.gz
+*.xz
+*.zst
 /asm/
 /assets/
 /ghidra/
-# splat writes it with this machine's absolute paths (nothing includes it)
-/include/include_asm.h
+memcards/
+memcards_fresh/
 
-# Texture packs (the game's art, upscaled or redrawn): they go in the settings folder, never in the repository
-/textures/
-
-# Build output, test references and pictures (configure.py, tools/build.py, tools/render_check.py, tools/run_pcsx2.py)
-/build/
-/build.ninja
-/.ninja_log
-/.ninja_deps
-
-# This machine's paths (local.example.json shows them)
-/local.json
-
-# Python
-/.venv/
-__pycache__/
-*.py[cod]
-
-# Editors and systems: everyone's own editor settings, clangd's index
-/.vscode/
+# --- editor / OS ---
 .cache/
 .idea/
+.vscode/
 *.swp
 *~
 .DS_Store
 Thumbs.db
-desktop.ini
+__pycache__/
+*.py[cod]
+.venv/
 
-# FFmpeg's source release (native/tools/build_ffmpeg.sh downloads and builds it; see native/third_party/ffmpeg/README.md)
-/native/third_party/ffmpeg-src/
-
-# Android app (android/)
-android/build/
-android/.gradle/
-android/local.properties
-android/.idea/
-build-input/
-android/app/src/main/jniLibs/
-android/native/build/
+# --- manual play dirs and build logs in the checkout (never committed) ---
+my_play*/
+build*.log
+# The PS Vita LiveArea pictures are tracked (the asset scan names them; tools/vita/livearea/)
+!tools/vita/livearea/icon0.png
+!tools/vita/livearea/pic0.png
+!tools/vita/livearea/bg.png
+!tools/vita/livearea/startup.png
