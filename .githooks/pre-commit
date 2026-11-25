@@ -1,0 +1,32 @@
+#!/bin/sh
+# Refuses a commit that adds or changes one of the game's files: native/tools/check_game_data.py says which and why (by name,
+# folder and size; the first bytes are read from the working tree's copy); or a text file with a stray control byte or
+# Windows line ends (native/tools/check_text_files.py). Turned on once per clone:
+#     git config core.hooksPath .githooks
+root=$(git rev-parse --show-toplevel)
+staged=$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+# Python: the clone's .venv, else the launcher on Windows, else python3 or python
+python() {
+    if [ -x "$root/.venv/Scripts/python.exe" ]; then "$root/.venv/Scripts/python.exe" "$@"
+    elif [ -x "$root/.venv/bin/python" ]; then "$root/.venv/bin/python" "$@"
+    elif command -v py >/dev/null 2>&1; then py -3 "$@"
+    elif command -v python3 >/dev/null 2>&1; then python3 "$@"
+    else command python "$@"
+    fi
+}
+
+cd "$root" || exit 1
+# One file a line (names with spaces kept whole)
+IFS='
+'
+python native/tools/check_game_data.py $staged || {
+    echo "pre-commit: commit refused. Unstage those files (git restore --staged FILE) and never add them again." >&2
+    exit 1
+}
+# A text file a script left a control byte (a backspace from a "\b", a NUL) or Windows line ends in
+python native/tools/check_text_files.py $staged || {
+    echo "pre-commit: commit refused. Fix those bytes (an editor, or the Edit tool) and stage the files again." >&2
+    exit 1
+}

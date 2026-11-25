@@ -1,0 +1,71 @@
+name: Android
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Build debug APK
+        working-directory: android
+        run: gradle --no-daemon :app:assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CrashTwinsanity-debug
+          path: android/app/build/outputs/apk/debug/*.apk
+
+  game-data:
+    # Runs only when the GAME_DATA_URL secret exists. Nothing from it is uploaded or put in the APK.
+    runs-on: ubuntu-latest
+    env:
+      GAME_DATA_URL: ${{ secrets.GAME_DATA_URL }}
+      GAME_DATA_SHA256: ${{ vars.GAME_DATA_SHA256 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the game split
+        if: env.GAME_DATA_URL != ''
+        run: bash tools/fetch_game_data.sh
+      - name: Engine build (waits for the native Android target)
+        if: env.GAME_DATA_URL != ''
+        run: echo "build-input/ is ready; the native Android target is not in this repo yet"
+
+  release:
+    needs: build-apk
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Build release APK
+        working-directory: android
+        run: gradle --no-daemon :app:assembleRelease
+      - name: Publish to the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android/app/build/outputs/apk/release/*.apk

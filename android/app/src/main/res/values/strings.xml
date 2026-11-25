@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Crash Twinsanity</string>
+    <string name="pick_disc">Elige tu disco de Crash Twinsanity (PAL SLES-52568 o NTSC-U SLUS-20909).</string>
+    <string name="rom_not_disc">Ese archivo no es un disco. Elige un .iso, .bin o .img.</string>
+    <string name="disc_open_failed">No se pudo abrir el disco.</string>
+    <string name="engine_missing">El motor nativo todavía no está en esta compilación. Los controles y menús ya funcionan; el juego arrancará cuando se enlace el motor.</string>
+    <string name="menu_pause">Pausa (Start)</string>
+    <string name="menu_edit">Editar controles</string>
+    <string name="menu_profile">Perfil: %1$s</string>
+    <string name="menu_screen">Pantalla: %1$s</string>
+    <string name="menu_change_disc">Cambiar disco</string>
+    <string name="menu_quit">Salir</string>
+    <string name="edit_title">Arrastra un control para moverlo. Ajusta tamaño y opacidad abajo.</string>
+    <string name="edit_size">Tamaño</string>
+    <string name="edit_opacity">Opacidad</string>
+    <string name="edit_done">Listo</string>
+    <string name="edit_reset">Restablecer</string>
+</resources>
