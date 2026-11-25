@@ -43,3 +43,5 @@ android/.gradle/
 android/local.properties
 android/.idea/
 build-input/
+android/app/src/main/jniLibs/
+android/native/build/

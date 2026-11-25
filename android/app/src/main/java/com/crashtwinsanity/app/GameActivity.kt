@@ -27,7 +27,6 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
     private lateinit var menuPanel: LinearLayout
     private lateinit var editPanel: LinearLayout
     private lateinit var notice: TextView
-    private lateinit var profileButton: Button
     private lateinit var screenButton: Button
     private lateinit var sizeBar: SeekBar
     private lateinit var alphaBar: SeekBar
@@ -48,9 +47,9 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
             surface.holder.addCallback(this@GameActivity)
         }
         touchPad = TouchOverlay(this).apply {
-            slots = settings.loadSlots(settings.profile)
+            slots = settings.loadSlots()
             onPad = { bits, lx, ly -> NativeBridge.setPad(bits, lx, ly) }
-            onEdited = { settings.saveSlots(settings.profile, slots) }
+            onEdited = { settings.saveSlots(slots) }
             onSelectionChanged = { s -> syncEditBars(s) }
         }
         notice = TextView(this).apply {
@@ -110,7 +109,6 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
     // ----- menus (touch) ------------------------------------------------------------------------------------------
 
     private fun buildMenu(): LinearLayout {
-        profileButton = menuItem(getString(R.string.menu_profile, settings.profile.label)) { cycleProfile() }
         screenButton = menuItem(getString(R.string.menu_screen, settings.screen.label)) { cycleScreen() }
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -125,7 +123,6 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
                 hideMenu()
                 setEditing(true)
             })
-            addView(profileButton)
             addView(screenButton)
             addView(menuItem(getString(R.string.menu_change_disc)) {
                 hideMenu()
@@ -143,14 +140,6 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
 
     private fun hideMenu() {
         menuPanel.visibility = View.GONE
-    }
-
-    private fun cycleProfile() {
-        settings.saveSlots(settings.profile, touchPad.slots)
-        settings.profile = Profile.values()[(settings.profile.ordinal + 1) % Profile.values().size]
-        touchPad.slots = settings.loadSlots(settings.profile)
-        touchPad.selected = null
-        profileButton.text = getString(R.string.menu_profile, settings.profile.label)
     }
 
     private fun cycleScreen() {
@@ -227,9 +216,9 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
     }
 
     private fun resetLayout() {
-        settings.resetSlots(settings.profile)
+        settings.resetSlots()
         touchPad.selected = null
-        touchPad.slots = settings.loadSlots(settings.profile)
+        touchPad.slots = settings.loadSlots()
         touchPad.refresh()
     }
 
@@ -266,11 +255,9 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
             return
         }
         engineRunning = NativeBridge.start(fd)
-        if (engineRunning) {
-            notice.visibility = View.GONE
-        } else {
-            showNotice(R.string.disc_open_failed)
-        }
+        // Shows what the native side found on the disc (the executable, or why it failed).
+        notice.text = NativeBridge.status()
+        notice.visibility = View.VISIBLE
     }
 
     private fun showNotice(res: Int) {

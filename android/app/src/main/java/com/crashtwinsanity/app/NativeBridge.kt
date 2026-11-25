@@ -18,6 +18,7 @@ object NativeBridge {
     @JvmStatic private external fun nativeSurface(surface: Surface?, width: Int, height: Int, aspect: Float)
     @JvmStatic private external fun nativeSetPad(bits: Int, lx: Float, ly: Float)
     @JvmStatic private external fun nativeStop()
+    @JvmStatic private external fun nativeStatus(): String
 
     /** Opens the disc (the file descriptor is handed over) and starts the engine. */
     fun start(isoFd: Int): Boolean = available && nativeStart(isoFd)
@@ -35,4 +36,7 @@ object NativeBridge {
     fun stop() {
         if (available) nativeStop()
     }
+
+    /** What the native side last said: the disc check, or that the engine is stopped. */
+    fun status(): String = if (available) nativeStatus() else ""
 }

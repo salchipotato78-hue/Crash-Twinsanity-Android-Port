@@ -18,11 +18,10 @@ enum class ScreenMode(val label: String, val aspect: Float) {
 class AppSettings(context: Context) {
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
-    var profile: Profile
-        get() = Profile.values().firstOrNull { it.name == prefs.getString("profile", null) } ?: Profile.CORTEX
-        set(value) {
-            prefs.edit().putString("profile", value.name).apply()
-        }
+    companion object {
+        // v2: the reference sizes. Older saved layouts (other sizes) are not read.
+        private const val LAYOUT_KEY = "layout_v2"
+    }
 
     var screen: ScreenMode
         get() = ScreenMode.values().firstOrNull { it.name == prefs.getString("screen", null) } ?: ScreenMode.NATIVE
@@ -30,8 +29,8 @@ class AppSettings(context: Context) {
             prefs.edit().putString("screen", value.name).apply()
         }
 
-    fun loadSlots(profile: Profile): MutableList<Slot> {
-        val raw = prefs.getString("layout_${profile.name}", null) ?: return Layouts.preset(profile)
+    fun loadSlots(): MutableList<Slot> {
+        val raw = prefs.getString(LAYOUT_KEY, null) ?: return Layouts.cortex()
         return try {
             val array = JSONArray(raw)
             MutableList(array.length()) { i ->
@@ -45,11 +44,11 @@ class AppSettings(context: Context) {
                 )
             }
         } catch (e: Exception) {
-            Layouts.preset(profile)
+            Layouts.cortex()
         }
     }
 
-    fun saveSlots(profile: Profile, slots: List<Slot>) {
+    fun saveSlots(slots: List<Slot>) {
         val array = JSONArray()
         for (s in slots) {
             array.put(
@@ -61,10 +60,10 @@ class AppSettings(context: Context) {
                     .put("a", s.alpha.toDouble())
             )
         }
-        prefs.edit().putString("layout_${profile.name}", array.toString()).apply()
+        prefs.edit().putString(LAYOUT_KEY, array.toString()).apply()
     }
 
-    fun resetSlots(profile: Profile) {
-        prefs.edit().remove("layout_${profile.name}").apply()
+    fun resetSlots() {
+        prefs.edit().remove(LAYOUT_KEY).apply()
     }
 }

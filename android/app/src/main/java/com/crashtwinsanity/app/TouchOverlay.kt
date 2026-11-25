@@ -64,7 +64,7 @@ class TouchOverlay(context: Context) : View(context) {
     /** Where a control is on screen now: its centre from the slot, its width from the scale, its height from the art. */
     private fun boundsOf(s: Slot): RectF {
         val b = bitmap(s.control)
-        val w = s.control.widthDp * density * s.scale
+        val w = s.control.widthFraction * width * s.scale
         val h = w * b.height / b.width
         val cx = s.x * width
         val cy = s.y * height
