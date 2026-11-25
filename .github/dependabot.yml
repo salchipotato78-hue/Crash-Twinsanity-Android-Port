@@ -1,7 +1,9 @@
-# Keeps the workflows' actions (pinned by commit) up to date: a pull request when one has a new release
+# Dependabot's version updates are off (open-pull-requests-limit 0): the workflows run by hand only.
+# Security alerts still come through Settings > Security.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    open-pull-requests-limit: 0
