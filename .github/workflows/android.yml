@@ -72,7 +72,7 @@ jobs:
         run: |
           bash tools/android/ffmpeg_android.sh "$GITHUB_WORKSPACE/ffmpeg-android" 2>&1 | tee ffmpeg-android.log
 
-      - name: Build libtwinsanityevolved.so (arm64: the engine, the game and the JNI entry)
+      - name: "Build libtwinsanityevolved.so (arm64: the engine, the game and the JNI entry)"
         run: |
           cmake -S . -B build-android -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE="${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake" \
