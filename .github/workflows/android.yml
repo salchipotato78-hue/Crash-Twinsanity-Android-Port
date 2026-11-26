@@ -58,6 +58,22 @@ jobs:
         with:
           ndk-version: r28c
 
+      - name: Install ninja
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ninja-build
+
+      - name: Fetch the pinned toolchain (wasi-sdk 24.0, wabt 1.0.42)
+        run: bash tools/fetch_toolchain.sh
+
+      - name: Build tegame for arm64 (the game's library)
+        run: |
+          cmake -S . -B build-android -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 \
+            -DCMAKE_BUILD_TYPE=Release -DTE_ANDROID_GAME_ONLY=ON
+          cmake --build build-android --target tegame
+
       - name: Build FFmpeg for arm64 (the movies' MPEG-2 decoder)
         env:
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
@@ -71,6 +87,7 @@ jobs:
             -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 -DCMAKE_BUILD_TYPE=Release \
             -DCRASHTWIN_SDL_SRC="$GITHUB_WORKSPACE/build-sdl" \
             -DCRASHTWIN_FFMPEG_DIR="$GITHUB_WORKSPACE/ffmpeg-android" \
+            -DCRASHTWIN_TEGAME_LIB="$GITHUB_WORKSPACE/build-android/libtegame.a" \
             -DCRASHTWIN_OUT="$GITHUB_WORKSPACE/android/app/src/main/jniLibs/arm64-v8a"
           cmake --build build/native-android --config Release
           ls -la android/app/src/main/jniLibs/arm64-v8a/

@@ -2,7 +2,8 @@
 # Built by .github/workflows/android.yml with the NDK's CMake toolchain and an SDL 2.32 source tree:
 #   cmake -S android/native -B build/native-android -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
 #         -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 -DCRASHTWIN_SDL_SRC=<sdl source> \
-#         -DCRASHTWIN_FFMPEG_DIR=<prefix of tools/android/ffmpeg_android.sh> -DCRASHTWIN_OUT=<jniLibs/arm64-v8a>
+#         -DCRASHTWIN_FFMPEG_DIR=<prefix of tools/android/ffmpeg_android.sh> -DCRASHTWIN_TEGAME_LIB=<build-android/libtegame.a> \
+#         -DCRASHTWIN_OUT=<jniLibs/arm64-v8a>
 cmake_minimum_required(VERSION 3.22)
 project(twinsanityevolved_android LANGUAGES C CXX)
 
@@ -35,6 +36,15 @@ if(CRASHTWIN_FFMPEG_DIR)
     message(STATUS "twinsanityevolved: FFmpeg from ${CRASHTWIN_FFMPEG_DIR}")
 else()
     message(STATUS "twinsanityevolved: FFmpeg not given (-DCRASHTWIN_FFMPEG_DIR); building without it")
+endif()
+
+# CRASHTWIN_TEGAME_LIB: the game's library (libtegame.a, built by TE_ANDROID_GAME_ONLY). It is linked whole, on
+# purpose for now: nothing in this library is called yet, so the link lists every symbol the game needs that Android
+# does not provide yet. That list is the next step's work (android/README.md, hito 1).
+if(CRASHTWIN_TEGAME_LIB)
+    target_link_options(twinsanityevolved PRIVATE
+        "LINKER:--whole-archive" "${CRASHTWIN_TEGAME_LIB}" "LINKER:--no-whole-archive")
+    message(STATUS "twinsanityevolved: tegame from ${CRASHTWIN_TEGAME_LIB} (whole archive)")
 endif()
 
 if(CRASHTWIN_OUT)
