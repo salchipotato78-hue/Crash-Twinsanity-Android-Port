@@ -381,6 +381,11 @@ add_dependencies(tegame te_seam)
 # FFmpeg and the tools are host programs that the cross configure can't find, so the top level stops here: tegame
 # needs only the wasm2c output above, which the wasi-sdk builds on the host. .github/workflows/game-c-android.yml
 option(TE_ANDROID_GAME_ONLY "Only the game's library (tegame), for a cross target: the engine, SDL2, FFmpeg and the tools are skipped" OFF)
+# TE_ANDROID_ENGINE: the engine itself for the NDK (CMAKE_SYSTEM_NAME Android): the engine's host archives (nativeee),
+# te_platform_host and the game's library, all built by the same configure. SDL2 is fetched and built with the NDK
+# (no host package); FFmpeg is the NDK build of tools/android/ffmpeg_android.sh, given by TE_ANDROID_FFMPEG_DIR.
+option(TE_ANDROID_ENGINE "The engine and the game for an Android NDK target (SDL2 built from source, OpenGL ES, FFmpeg from TE_ANDROID_FFMPEG_DIR)" OFF)
+set(TE_ANDROID_FFMPEG_DIR "" CACHE PATH "The prefix of tools/android/ffmpeg_android.sh (lib/, include/): the FFmpeg of TE_ANDROID_ENGINE")
 if(TE_ANDROID_GAME_ONLY)
     message(STATUS "TwinsanityEvolved: TE_ANDROID_GAME_ONLY -- tegame only (${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR})")
     return()
@@ -485,6 +490,17 @@ if(TE_VITA)
          "-DFFMPEG_AVCODEC_LIBRARY=${TE_VITA_FFMPEG}/lib/libavcodec.a"
          "-DFFMPEG_AVUTIL_LIBRARY=${TE_VITA_FFMPEG}/lib/libavutil.a"
          "-DFFMPEG_SWSCALE_LIBRARY=${TE_VITA_FFMPEG}/lib/libswscale.a")
+endif()
+if(TE_ANDROID_ENGINE)
+    if(NOT TE_ANDROID_FFMPEG_DIR)
+        message(FATAL_ERROR "TE_ANDROID_ENGINE: set -DTE_ANDROID_FFMPEG_DIR to the prefix of tools/android/ffmpeg_android.sh")
+    endif()
+    set(PS2R_FETCH_SDL2 ON CACHE BOOL "" FORCE)   # the NDK has no SDL2 package: fetched and built with it
+    set(CMAKE_DISABLE_FIND_PACKAGE_SDL2 ON)
+    # SDL2 as libSDL2.so, at the release the app's SDLActivity Java is taken from (android.yml fetches release-2.32.10)
+    set(PS2R_SDL2_SHARED ON)
+    list(APPEND TE_ENGINE_FORWARDED_ARGS -DPS2R_FETCH_SDL2=ON -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=ON
+         -DPS2R_SDL2_SHARED=ON -DPS2R_SDL2_FETCH_TAG=release-2.32.10)
 endif()
 if(TE_DIST)
     set(PS2R_FETCH_SDL2 ON CACHE BOOL "" FORCE)
@@ -601,6 +617,18 @@ if(TE_VITA)
     include("${TE_ENGINE}/cmake/OpenGlDependency.cmake")
     target_link_libraries(nativeee_libs INTERFACE SDL2::SDL2 OpenGL::GL FFmpeg::avcodec FFmpeg::swscale FFmpeg::avutil m)
     target_link_options(nativeee_libs INTERFACE "LINKER:--whole-archive,-lpthread,--no-whole-archive")
+elseif(TE_ANDROID_ENGINE)
+    # The NDK: OpenGL ES 3 + EGL (engine/cmake/OpenGlDependency.cmake's Android arm) and FFmpeg from the NDK build,
+    # found by the engine's own finder through these cache paths (the same pattern as the Vita lane above).
+    set(FFMPEG_INCLUDE_DIR "${TE_ANDROID_FFMPEG_DIR}/include" CACHE PATH "FFmpeg headers (the NDK build)" FORCE)
+    set(FFMPEG_AVCODEC_LIBRARY "${TE_ANDROID_FFMPEG_DIR}/lib/libavcodec.a" CACHE FILEPATH "libavcodec (the NDK build)" FORCE)
+    set(FFMPEG_AVUTIL_LIBRARY "${TE_ANDROID_FFMPEG_DIR}/lib/libavutil.a" CACHE FILEPATH "libavutil (the NDK build)" FORCE)
+    set(FFMPEG_SWSCALE_LIBRARY "${TE_ANDROID_FFMPEG_DIR}/lib/libswscale.a" CACHE FILEPATH "libswscale (the NDK build)" FORCE)
+    include("${TE_ENGINE}/cmake/OpenGlDependency.cmake")
+    include("${TE_ENGINE}/cmake/FindFFmpeg.cmake")
+    set(TE_HAVE_SDL_INPUT 1)
+    # Static archives: each after the ones that use it (avcodec -> swscale -> avutil), then the threads.
+    target_link_libraries(nativeee_libs INTERFACE Threads::Threads SDL2::SDL2 OpenGL::GL FFmpeg::avcodec FFmpeg::avutil FFmpeg::swscale)
 else()
 find_package(OpenGL REQUIRED)
 # FFmpeg (libavcodec / libavutil / libswscale): the movies' MPEG-2 video decoder (ps2r_ipu, behind ps2e_movie). The
@@ -808,6 +836,32 @@ else()
 target_link_libraries(twinsanityevolved PRIVATE tegame "$<LINK_LIBRARY:WHOLE_ARCHIVE,te_platform_host>" te_disc_identity nativeee_libs te_seam_stubs)
 endif()
 add_dependencies(twinsanityevolved nativeee)
+
+# TE_ANDROID_ENGINE: libtwinsanityevolved.so, the library SDLActivity loads (NativeBridge.kt). The same link as the
+# desktop runner (the module, the owner bodies, the engine, the weak stubs last), with the runner's game core and the
+# JNI entry (android/native/src) in place of the desktop main(). Build it with --target twinsanityevolved_android.
+set(TE_ANDROID_JNILIBS "" CACHE PATH "Where libtwinsanityevolved.so and libSDL2.so are copied (the app's jniLibs/arm64-v8a)")
+if(TE_ANDROID_ENGINE)
+    add_library(twinsanityevolved_android SHARED
+        android/native/src/twinsanityevolved_jni.cpp android/native/src/iso9660.cpp
+        runner/te_env.cpp runner/te_run.c runner/te_startup.cpp runner/te_fiber.c ${TE_FIBER_SWITCH}
+        runner/te_game.cpp "${TE_ENGINE}/app/host/game_folder.cpp")
+    target_include_directories(twinsanityevolved_android PRIVATE
+        "${CMAKE_SOURCE_DIR}/android/native/src" "${CMAKE_SOURCE_DIR}/runner" "${CMAKE_SOURCE_DIR}/platform/nativeee/host")
+    target_compile_options(twinsanityevolved_android PRIVATE -Wall -Wextra)
+    target_compile_definitions(twinsanityevolved_android PRIVATE TE_HAVE_FFMPEG=1)
+    set_target_properties(twinsanityevolved_android PROPERTIES OUTPUT_NAME twinsanityevolved C_STANDARD 99 C_EXTENSIONS ON)
+    # Link order as the desktop runner: the module, the owner bodies (WHOLE), the engine, the weak stubs LAST.
+    target_link_libraries(twinsanityevolved_android PRIVATE tegame "$<LINK_LIBRARY:WHOLE_ARCHIVE,te_platform_host>"
+        te_disc_identity nativeee_libs te_seam_stubs log android)
+    add_dependencies(twinsanityevolved_android nativeee)
+    if(TE_ANDROID_JNILIBS)
+        add_custom_command(TARGET twinsanityevolved_android POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${TE_ANDROID_JNILIBS}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:twinsanityevolved_android> "${TE_ANDROID_JNILIBS}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL2> "${TE_ANDROID_JNILIBS}")
+    endif()
+endif()
 
 if(TE_VITA)
     # The eboot and the .vpk (VitaSDK's vita.cmake: vita-elf-create -> vita-make-fself -> vita-mksfoex -> vita-pack-vpk).

@@ -14,7 +14,7 @@ namespace { using Target = PlatformMacos; }
 namespace ps2r::platform::host {
 namespace { using Target = PlatformVita; }
 }  // namespace ps2r::platform::host
-#elif PS2R_HOST_LINUX
+#elif PS2R_HOST_LINUX || PS2R_HOST_ANDROID
 #include "engine/platform/linux/platform_linux.h"
 namespace ps2r::platform::host {
 namespace { using Target = PlatformLinux; }

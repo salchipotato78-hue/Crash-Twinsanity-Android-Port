@@ -11,6 +11,11 @@ elseif(APPLE)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(PS2R_HOST_TARGET linux)
     set(PS2R_HOST_TARGET_SOURCES linux/platform_linux.cpp)
+elseif(ANDROID)
+    # The NDK target: the Linux Platform class (pthread names, POSIX host calls, std::filesystem), with the Android
+    # arm of host/platform.h (OpenGL ES 3 through engine/platform/android/gl_android.h).
+    set(PS2R_HOST_TARGET android)
+    set(PS2R_HOST_TARGET_SOURCES linux/platform_linux.cpp)
 elseif(WIN32)
     set(PS2R_HOST_TARGET windows)
     set(PS2R_HOST_TARGET_SOURCES windows/platform_windows.cpp)
