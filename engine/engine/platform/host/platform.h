@@ -68,6 +68,14 @@
 #define PS2R_HOST_MACOS 0
 #define PS2R_HOST_LINUX 0
 #define PS2R_HOST_VITA 1
+#elif defined(__ANDROID__)
+// The Android target (engine/platform/android/): OpenGL ES 3.1, with shims for the desktop GL 4.x calls the render
+// backend makes that ES 3.1 does not have. Android defines __linux__ too, so this arm comes first.
+#define PS2R_GL_HEADER "engine/platform/android/gl_android.h"
+#define PS2R_HOST_MACOS 0
+#define PS2R_HOST_LINUX 0
+#define PS2R_HOST_VITA 0
+#define PS2R_HOST_ANDROID 1
 #elif defined(__linux__)
 #ifndef GL_GLEXT_PROTOTYPES
 #define GL_GLEXT_PROTOTYPES 1
