@@ -448,7 +448,8 @@ option(TE_DIST "Release shape: static SDL2 (engine recipe) + the static LGPL FFm
 option(TE_LTO "Link-time optimisation for the port and the engine (PS2R_LTO)" OFF)
 set(TE_ENGINE_FORWARDED_ARGS "")
 foreach(var CMAKE_C_COMPILER_LAUNCHER CMAKE_CXX_COMPILER_LAUNCHER CMAKE_TOOLCHAIN_FILE VCPKG_TARGET_TRIPLET CMAKE_LINKER
-            CMAKE_PREFIX_PATH CMAKE_OSX_ARCHITECTURES CMAKE_OSX_DEPLOYMENT_TARGET)
+            CMAKE_PREFIX_PATH CMAKE_OSX_ARCHITECTURES CMAKE_OSX_DEPLOYMENT_TARGET
+            ANDROID_ABI ANDROID_PLATFORM)   # the NDK toolchain reads these: without them the engine built for its default ABI
     if(DEFINED ${var} AND NOT "${${var}}" STREQUAL "")
         string(REPLACE ";" "|" _fwd "${${var}}")   # ExternalProject LIST_SEPARATOR below
         list(APPEND TE_ENGINE_FORWARDED_ARGS "-D${var}=${_fwd}")
@@ -501,6 +502,12 @@ if(TE_ANDROID_ENGINE)
     set(PS2R_SDL2_SHARED ON)
     list(APPEND TE_ENGINE_FORWARDED_ARGS -DPS2R_FETCH_SDL2=ON -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=ON
          -DPS2R_SDL2_SHARED=ON -DPS2R_SDL2_FETCH_TAG=release-2.32.10)
+    # the engine's own FFmpeg finder reads the same NDK build (FindFFmpeg.cmake: its cache entries are these)
+    list(APPEND TE_ENGINE_FORWARDED_ARGS
+         "-DFFMPEG_INCLUDE_DIR=${TE_ANDROID_FFMPEG_DIR}/include"
+         "-DFFMPEG_AVCODEC_LIBRARY=${TE_ANDROID_FFMPEG_DIR}/lib/libavcodec.a"
+         "-DFFMPEG_AVUTIL_LIBRARY=${TE_ANDROID_FFMPEG_DIR}/lib/libavutil.a"
+         "-DFFMPEG_SWSCALE_LIBRARY=${TE_ANDROID_FFMPEG_DIR}/lib/libswscale.a")
 endif()
 if(TE_DIST)
     set(PS2R_FETCH_SDL2 ON CACHE BOOL "" FORCE)
