@@ -1,6 +1,9 @@
 // platform/linux/platform_linux.cpp
 #include "engine/platform/linux/platform_linux.h"
 #include "engine/platform/posix/fiber_posix.h"
+#if defined(__ANDROID__)
+#include "engine/platform/android/fiber_android.h"
+#endif
 
 #include <pthread.h>
 #include <unistd.h>
@@ -86,10 +89,17 @@ Platform Build() {
     p.open = &Open;
     p.thread_create = &ThreadCreate;
     p.thread_join = &ThreadJoin;
+#if defined(__ANDROID__)
+    p.fiber_create = &FiberAndroid::Create;
+    p.fiber_switch = &FiberAndroid::Switch;
+    p.fiber_current = &FiberAndroid::Current;
+    p.fiber_destroy = &FiberAndroid::Destroy;
+#else
     p.fiber_create = &FiberPosix::Create;
     p.fiber_switch = &FiberPosix::Switch;
     p.fiber_current = &FiberPosix::Current;
     p.fiber_destroy = &FiberPosix::Destroy;
+#endif
     p.now_ns = &NowNs;
     p.timer_create = &UnimplementedTimerCreate;
     p.cpu_relax = &CpuRelax;

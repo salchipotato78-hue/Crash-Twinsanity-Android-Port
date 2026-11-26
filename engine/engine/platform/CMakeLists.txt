@@ -42,6 +42,8 @@ if(WIN32)
 elseif(VITA)
     target_sources(ps2r_host PRIVATE host/host_posix.cpp vita/fiber_vita.cpp)
     target_link_libraries(ps2r_host PUBLIC SceIofilemgr_stub SceSysmem_stub SceKernelThreadMgr_stub)
+elseif(ANDROID)
+    target_sources(ps2r_host PRIVATE host/host_posix.cpp android/fiber_android.cpp)   # Bionic has no ucontext
 else()
     target_sources(ps2r_host PRIVATE host/host_posix.cpp posix/fiber_posix.cpp)
 endif()
