@@ -43,7 +43,8 @@ endif()
 # does not provide yet. That list is the next step's work (android/README.md, hito 1).
 if(CRASHTWIN_TEGAME_LIB)
     target_link_options(twinsanityevolved PRIVATE
-        "LINKER:--whole-archive" "${CRASHTWIN_TEGAME_LIB}" "LINKER:--no-whole-archive")
+        "LINKER:--whole-archive" "${CRASHTWIN_TEGAME_LIB}" "LINKER:--no-whole-archive"
+        "LINKER:--error-limit=0")   # every missing symbol, not the first 20
     message(STATUS "twinsanityevolved: tegame from ${CRASHTWIN_TEGAME_LIB} (whole archive)")
 endif()
 
