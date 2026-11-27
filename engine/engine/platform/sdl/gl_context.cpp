@@ -21,10 +21,17 @@ namespace platform {
 GlContext::~GlContext() { Destroy(); }
 
 void GlContext::RequestAttributes() {
+#if defined(__ANDROID__)
+    // Android has OpenGL ES only, no desktop core profile: ES 3.1, the version gl_android.h's shims are written for.
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+#else
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
+#endif
 #ifdef _WIN32
     // 24, not 32, on Windows. The accelerated ICDs (nvoglv64 / igxelpicd64)
     // advertise 24-bit depth with 8 stencil and no 32-bit depth format at all,
