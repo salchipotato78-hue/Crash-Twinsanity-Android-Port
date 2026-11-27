@@ -106,7 +106,13 @@ struct VideoConfig {
     RenderRate   render_rate = RenderRate::Tick60;
     FrameRateSel frame_rate = FrameRateSel::Rate60;
     VideoBackend backend = VideoBackend::Gl;
+#if defined(__ANDROID__)
+    // The phone is ultrawide: aspect Auto snaps to the nearest shape (21:9 here) so the game is drawn wide, and the
+    // frame fills the screen (the 7% difference to 21:9 is the only stretch).
+    FitMode      fit_mode = FitMode::Stretch;
+#else
     FitMode      fit_mode = FitMode::Fit;
+#endif
     AspectSel    aspect = AspectSel::Auto;
     int          custom_scale_pct = 100;  // 25..400
     int          custom_offset_x = 0;     // -8192..8192

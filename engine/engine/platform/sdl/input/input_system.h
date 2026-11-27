@@ -11,6 +11,7 @@
 #include <memory>
 #include <string>
 
+#include "engine/platform/sdl/input/android_pad_backend.h"
 #include "engine/platform/sdl/input/input_mapper.h"
 #include "engine/platform/sdl/input/input_settings.h"
 #include "engine/platform/sdl/input/pad_sample.h"
@@ -96,6 +97,7 @@ private:
     InputMapper   mapper_;
     std::unique_ptr<KeyboardMouseBackend> kbm_;
     std::unique_ptr<GamepadBackend>       gamepad_;
+    std::unique_ptr<AndroidPadBackend>    android_pad_;   // the Android touch overlay (idle elsewhere)
     PadSample last_;
     bool ui_capture_ = false;
     bool kbm_enabled_ = true;

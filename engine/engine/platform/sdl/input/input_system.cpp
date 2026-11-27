@@ -6,6 +6,7 @@
 #include <fstream>
 #include <SDL.h>
 
+#include "engine/platform/sdl/input/android_pad_backend.h"
 #include "engine/platform/sdl/input/gamepad_backend.h"
 #include "engine/platform/sdl/input/input_backend.h"
 #include "engine/platform/sdl/input/keyboard_mouse_backend.h"
@@ -52,6 +53,7 @@ void InputSystem::Init(const InputSettings& settings) {
 
     kbm_     = std::make_unique<KeyboardMouseBackend>(&mapper_);
     gamepad_ = std::make_unique<GamepadBackend>(deadzone, sensitivity, pad_enabled, settings.gamecontrollerdb_path);
+    android_pad_ = std::make_unique<AndroidPadBackend>();
     gamepad_->SetButtonMap(b.pad_map);   // [pad] remap (the baked default when no file / no section)
     kbm_->SetUiCaptured(ui_capture_ || !kbm_enabled_);
     gamepad_->SetUiCaptured(ui_capture_);
@@ -61,6 +63,7 @@ void InputSystem::Init(const InputSettings& settings) {
 }
 
 void InputSystem::Shutdown() {
+    android_pad_.reset();
     gamepad_.reset();
     kbm_.reset();
     initialized_ = false;
@@ -138,7 +141,7 @@ PadSample InputSystem::Frame(float dt_seconds) {
     if (!initialized_) return PadSample{};   // neutral: no buttons, sticks 0x80
 
     NormalizedInput merged;
-    InputBackend* order[2] = {kbm_.get(), gamepad_.get()};
+    InputBackend* order[3] = {kbm_.get(), gamepad_.get(), android_pad_.get()};
     for (InputBackend* be : order) {
         if (!be || !be->IsActive()) continue;
         NormalizedInput one;

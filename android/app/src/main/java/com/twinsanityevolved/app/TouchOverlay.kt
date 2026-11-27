@@ -114,15 +114,24 @@ class TouchOverlay(context: Context) : View(context) {
                 if (s != null) {
                     pointerOwner[e.getPointerId(i)] = s
                     if (s.control.isStick) moveStick(s, e.getX(i), e.getY(i))
+                } else {
+                    startTap(e.getPointerId(i), e.getX(i), e.getY(i))
                 }
             }
             MotionEvent.ACTION_MOVE -> {
+                for (i in 0 until e.pointerCount) {
+                    val id = e.getPointerId(i)
+                    if (id == tapPointer && hypot(e.getX(i) - tapX, e.getY(i) - tapY) > tapSlop()) tapPointer = -1
+                }
                 for (i in 0 until e.pointerCount) {
                     val s = pointerOwner[e.getPointerId(i)] ?: continue
                     if (s.control.isStick) moveStick(s, e.getX(i), e.getY(i))
                 }
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> release(e.getPointerId(e.actionIndex))
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                endTap(e.getPointerId(e.actionIndex), e.getX(e.actionIndex), e.getY(e.actionIndex))
+                release(e.getPointerId(e.actionIndex))
+            }
             MotionEvent.ACTION_CANCEL -> {
                 pointerOwner.clear()
                 stickVector.set(0f, 0f)
@@ -130,6 +139,30 @@ class TouchOverlay(context: Context) : View(context) {
         }
         publish()
         return true
+    }
+
+    // A tap: a short touch that did not move, on an empty area of the screen. It presses CROSS (the menus' confirm),
+    // so the menus work by touch without knowing where their items are.
+    private var tapPointer = -1
+    private var tapX = 0f
+    private var tapY = 0f
+    private var tapStart = 0L
+    private fun tapSlop(): Float = 24f * resources.displayMetrics.density
+
+    private fun startTap(pointerId: Int, x: Float, y: Float) {
+        if (tapPointer != -1) return   // one tap at a time
+        tapPointer = pointerId
+        tapX = x
+        tapY = y
+        tapStart = System.currentTimeMillis()
+    }
+
+    private fun endTap(pointerId: Int, x: Float, y: Float) {
+        if (pointerId != tapPointer) return
+        tapPointer = -1
+        val quick = System.currentTimeMillis() - tapStart < 250L
+        val still = hypot(x - tapX, y - tapY) <= tapSlop()
+        if (quick && still) pulse(Pad.CROSS)
     }
 
     private fun release(pointerId: Int) {

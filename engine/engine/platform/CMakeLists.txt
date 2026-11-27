@@ -107,6 +107,7 @@ target_sources(ps2r_platform_sdl PRIVATE   # phase7 half attached to phase6's ta
     sdl/input/pad_button_map.cpp
     sdl/input/keyboard_mouse_backend.cpp
     sdl/input/gamepad_backend.cpp
+    sdl/input/android_pad_backend.cpp
     sdl/input/input_system.cpp)
 target_include_directories(ps2r_platform_sdl PUBLIC ${CMAKE_SOURCE_DIR})
 target_include_directories(ps2r_platform_sdl PRIVATE ${PS2R_GENERATED_DIR})

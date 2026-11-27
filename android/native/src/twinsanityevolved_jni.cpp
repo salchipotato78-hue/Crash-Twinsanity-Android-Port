@@ -147,6 +147,13 @@ Java_com_twinsanityevolved_app_NativeBridge_nativeStop(JNIEnv*, jclass) {
     g_status = "motor detenido";
 }
 
+// The engine reads the touch overlay's last pad state through this (platform/sdl/input/android_pad_backend.cpp).
+void te_android_pad_read(uint32_t* bits, float* lx, float* ly) {
+    *bits = static_cast<uint32_t>(g_pad.load());
+    *lx = g_stickX.load();
+    *ly = g_stickY.load();
+}
+
 JNIEXPORT jstring JNICALL
 Java_com_twinsanityevolved_app_NativeBridge_nativeStatus(JNIEnv* env, jclass) {
     std::lock_guard<std::mutex> lock(g_lock);
