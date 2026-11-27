@@ -96,7 +96,13 @@ class GameActivity : SDLActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideSystemBars()
+        if (hasFocus) hideSystemBars() else touchPad.releaseAll()
+    }
+
+    // A notification, a call or the home button can swallow the fingers' up events: the pad must not keep them held.
+    override fun onPause() {
+        touchPad.releaseAll()
+        super.onPause()
     }
 
     private fun hideSystemBars() {

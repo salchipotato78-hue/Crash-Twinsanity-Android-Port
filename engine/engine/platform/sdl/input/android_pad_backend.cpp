@@ -14,6 +14,8 @@ namespace {
 // The Java Pad bits (android/app Layouts.kt): CROSS 1, CIRCLE 2, SQUARE 4, TRIANGLE 8, L1 16, R1 32, START 64.
 constexpr uint32_t kJavaCross = 1, kJavaCircle = 2, kJavaSquare = 4, kJavaTriangle = 8,
                    kJavaL1 = 16, kJavaR1 = 32, kJavaStart = 64;
+// The touch overlay's d-pad bits (Pad.UP..RIGHT in Layouts.kt): a swipe across the screen moves the menus.
+constexpr uint32_t kJavaUp = 128, kJavaDown = 256, kJavaLeft = 512, kJavaRight = 1024;
 // A push past half-way on the stick is also a d-pad press: the PS2 menus read the d-pad.
 constexpr float kDpadThreshold = 0.5f;
 }  // namespace
@@ -40,6 +42,10 @@ void AndroidPadBackend::Poll(NormalizedInput& out) {
     if (bits & kJavaL1)       b |= kBtnL1;
     if (bits & kJavaR1)       b |= kBtnR1;
     if (bits & kJavaStart)    b |= kBtnStart;
+    if (bits & kJavaUp)       b |= kBtnUp;
+    if (bits & kJavaDown)     b |= kBtnDown;
+    if (bits & kJavaLeft)     b |= kBtnLeft;
+    if (bits & kJavaRight)    b |= kBtnRight;
     if (lx >  kDpadThreshold) b |= kBtnRight;
     if (lx < -kDpadThreshold) b |= kBtnLeft;
     if (ly >  kDpadThreshold) b |= kBtnUp;

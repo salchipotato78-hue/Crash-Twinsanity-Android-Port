@@ -78,11 +78,27 @@ class TouchOverlay(context: Context) : View(context) {
 
     fun refresh() = invalidate()
 
-    /** A button tapped from the menu: pressed for a moment (the Start button in the menu). */
-    fun pulse(bit: Int) {
+    /** A button pressed for a moment: the menu's Start, or one step of a finger swipe. */
+    fun pulse(bit: Int, ms: Long = 120L) {
         pulseBits = bit
         publish()
-        postDelayed({ pulseBits = 0; publish() }, 120)
+        val seq = ++pulseSeq
+        postDelayed({ if (seq == pulseSeq) { pulseBits = 0; publish() } }, ms)
+    }
+
+    private var pulseSeq = 0
+
+    /**
+     * Lets go of everything: no finger is down, the stick is centred. Called when the game loses focus or pauses,
+     * because the touch-up of a finger held then may never arrive, and the pad would stay pressed.
+     */
+    fun releaseAll() {
+        pointerOwner.clear()
+        stickVector.set(0f, 0f)
+        tapPointer = -1
+        dragging = false
+        pulseBits = 0
+        publish()
     }
 
     fun commitEdit() {
@@ -107,6 +123,14 @@ class TouchOverlay(context: Context) : View(context) {
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         if (editing) return editTouch(e)
+        // A finger the event no longer lists has lifted (its up was lost): let it go, or the stick stays deflected.
+        val present = HashSet<Int>()
+        for (i in 0 until e.pointerCount) present.add(e.getPointerId(i))
+        if (pointerOwner.keys.any { it !in present }) {
+            pointerOwner.keys.retainAll(present)
+            if (pointerOwner.values.none { it.control.isStick }) stickVector.set(0f, 0f)
+        }
+        if (tapPointer != -1 && tapPointer !in present) tapPointer = -1
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 val i = e.actionIndex
@@ -120,8 +144,7 @@ class TouchOverlay(context: Context) : View(context) {
             }
             MotionEvent.ACTION_MOVE -> {
                 for (i in 0 until e.pointerCount) {
-                    val id = e.getPointerId(i)
-                    if (id == tapPointer && hypot(e.getX(i) - tapX, e.getY(i) - tapY) > tapSlop()) tapPointer = -1
+                    if (e.getPointerId(i) == tapPointer) swipe(e.getX(i), e.getY(i))
                 }
                 for (i in 0 until e.pointerCount) {
                     val s = pointerOwner[e.getPointerId(i)] ?: continue
@@ -135,6 +158,8 @@ class TouchOverlay(context: Context) : View(context) {
             MotionEvent.ACTION_CANCEL -> {
                 pointerOwner.clear()
                 stickVector.set(0f, 0f)
+                tapPointer = -1
+                swiping = false
             }
         }
         publish()
@@ -143,26 +168,54 @@ class TouchOverlay(context: Context) : View(context) {
 
     // A tap: a short touch that did not move, on an empty area of the screen. It presses CROSS (the menus' confirm),
     // so the menus work by touch without knowing where their items are.
+    // A finger that starts on empty screen is a tap, or a swipe once it moves. A swipe steps the menu: each
+    // stride of the finger is one press of the d-pad in that direction, so the menus follow the finger.
     private var tapPointer = -1
     private var tapX = 0f
     private var tapY = 0f
+    private var swipeX = 0f
+    private var swipeY = 0f
     private var tapStart = 0L
     private fun tapSlop(): Float = 24f * resources.displayMetrics.density
+    private fun swipeStride(): Float = 36f * resources.displayMetrics.density
 
     private fun startTap(pointerId: Int, x: Float, y: Float) {
         if (tapPointer != -1) return   // one tap at a time
         tapPointer = pointerId
         tapX = x
         tapY = y
+        swipeX = x
+        swipeY = y
         tapStart = System.currentTimeMillis()
     }
+
+    private fun swipe(x: Float, y: Float) {
+        if (tapPointer == -1) return
+        if (!swiping && hypot(x - tapX, y - tapY) <= tapSlop()) return
+        swiping = true
+        val dx = x - swipeX
+        val dy = y - swipeY
+        val stride = swipeStride()
+        when {
+            kotlin.math.abs(dy) >= stride && kotlin.math.abs(dy) >= kotlin.math.abs(dx) -> {
+                pulse(if (dy > 0) Pad.DOWN else Pad.UP, 90L)
+                swipeX = x; swipeY = y
+            }
+            kotlin.math.abs(dx) >= stride -> {
+                pulse(if (dx > 0) Pad.RIGHT else Pad.LEFT, 90L)
+                swipeX = x; swipeY = y
+            }
+        }
+    }
+    private var swiping = false
 
     private fun endTap(pointerId: Int, x: Float, y: Float) {
         if (pointerId != tapPointer) return
         tapPointer = -1
         val quick = System.currentTimeMillis() - tapStart < 250L
         val still = hypot(x - tapX, y - tapY) <= tapSlop()
-        if (quick && still) pulse(Pad.CROSS)
+        if (quick && still && !swiping) pulse(Pad.CROSS)
+        swiping = false
     }
 
     private fun release(pointerId: Int) {

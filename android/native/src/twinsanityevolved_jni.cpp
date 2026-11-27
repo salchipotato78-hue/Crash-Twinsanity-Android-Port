@@ -38,6 +38,13 @@ std::atomic<int> g_pad{0};
 std::atomic<float> g_stickX{0.0f};
 std::atomic<float> g_stickY{0.0f};
 
+// The pad is a static state: a stick or button left held by a lost touch-up must not outlive its activity.
+void ResetPad() {
+    g_pad.store(0);
+    g_stickX.store(0.0f);
+    g_stickY.store(0.0f);
+}
+
 // pread on the descriptor the app gave us: the disc is read in place, nothing is copied.
 bool ReadDisc(uint64_t offset, void* buffer, size_t length) {
     if (g_fd < 0) return false;
@@ -123,6 +130,7 @@ Java_com_twinsanityevolved_app_NativeBridge_nativeStart(JNIEnv* env, jclass, jst
     env->ReleaseStringUTFChars(isoPath, iso);
     env->ReleaseStringUTFChars(filesDir, dir);
     g_stop.store(false);
+    ResetPad();
     CheckDisc();
     const std::string ffmpeg = FfmpegCheck();
     LOGI("%s", ffmpeg.c_str());
@@ -141,6 +149,7 @@ JNIEXPORT void JNICALL
 Java_com_twinsanityevolved_app_NativeBridge_nativeStop(JNIEnv*, jclass) {
     std::lock_guard<std::mutex> lock(g_lock);
     g_stop.store(true);
+    ResetPad();
     if (g_fd >= 0) close(g_fd);
     g_fd = -1;
     g_discOk = false;

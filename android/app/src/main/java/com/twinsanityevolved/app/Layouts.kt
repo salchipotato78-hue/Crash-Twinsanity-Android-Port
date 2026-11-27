@@ -9,6 +9,11 @@ object Pad {
     const val L1 = 16
     const val R1 = 32
     const val START = 64
+    // D-pad: the menus' own directions. Sent by the touch overlay when a finger drags across the screen.
+    const val UP = 128
+    const val DOWN = 256
+    const val LEFT = 512
+    const val RIGHT = 1024
 }
 
 /**
