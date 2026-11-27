@@ -230,56 +230,15 @@ class GameActivity : SDLActivity() {
 
     /** Checks the disc and hands its descriptor to the native side; SDL_main then runs the engine. */
     private fun openDisc() {
-        val uri = RomStore.get(this)
-        if (uri == null) {
-            showNotice(R.string.pick_disc)
+        val path = intent.getStringExtra(DiscImport.EXTRA_DISC_PATH)
+        if (path == null) {
+            showNotice(R.string.disc_open_failed)
             return
         }
-        if (!NativeBridge.available) {
-            showNotice(R.string.engine_missing)
-            return
-        }
-        notice.text = "Preparando el disco (la primera vez se copia a la app)…"
+        // Before SDL's first frame: SDL starts the engine's main() as soon as the surface is ready, and main() reads the disc.
+        engineStarted = NativeBridge.start(path, filesDir.absolutePath)
+        notice.text = NativeBridge.status()
         notice.visibility = View.VISIBLE
-        Thread {
-            val path = try {
-                importDisc(uri)
-            } catch (e: Exception) {
-                null
-            }
-            runOnUiThread {
-                if (path == null) {
-                    showNotice(R.string.disc_open_failed)
-                    return@runOnUiThread
-                }
-                engineStarted = NativeBridge.start(path, filesDir.absolutePath)
-                // Shows what the native side found on the disc (the executable, or why it failed).
-                notice.text = NativeBridge.status()
-                notice.visibility = View.VISIBLE
-            }
-        }.start()
-    }
-
-    /**
-     * The disc copied into the app's own folder. A content descriptor cannot be reopened by path, so the engine reads
-     * a copy; the copy is kept, and only copied again when its size differs from the picked disc.
-     */
-    private fun importDisc(uri: Uri): String? {
-        val size = contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: -1L
-        if (size <= 0L) return null
-        val target = File(filesDir, "disc.iso")
-        if (target.exists() && target.length() == size) return target.absolutePath
-        val part = File(filesDir, "disc.iso.part")
-        contentResolver.openInputStream(uri)?.use { input ->
-            part.outputStream().use { out -> input.copyTo(out, 1 shl 20) }
-        } ?: return null
-        if (part.length() != size) {
-            part.delete()
-            return null
-        }
-        if (target.exists()) target.delete()
-        if (!part.renameTo(target)) return null
-        return target.absolutePath
     }
 
     private fun showNotice(res: Int) {

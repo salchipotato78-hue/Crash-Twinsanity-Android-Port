@@ -36,8 +36,23 @@ class MainActivity : Activity() {
     }
 
     private fun openGame() {
-        startActivity(Intent(this, GameActivity::class.java))
-        finish()
+        val uri = RomStore.get(this) ?: return
+        Toast.makeText(this, "Preparando el disco…", Toast.LENGTH_SHORT).show()
+        Thread {
+            val path = try {
+                DiscImport.importDisc(this, uri)
+            } catch (e: Exception) {
+                null
+            }
+            runOnUiThread {
+                if (path == null) {
+                    Toast.makeText(this, R.string.disc_open_failed, Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                startActivity(Intent(this, GameActivity::class.java).putExtra(DiscImport.EXTRA_DISC_PATH, path))
+                finish()
+            }
+        }.start()
     }
 
     companion object {
