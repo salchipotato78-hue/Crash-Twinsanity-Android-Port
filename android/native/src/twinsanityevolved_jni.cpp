@@ -89,7 +89,7 @@ void CheckDisc() {
     }
     g_discOk = true;
     char text[160];
-    std::snprintf(text, sizeof(text), "Disco leído: SLES_525.68, %u bytes. El motor aún no está enlazado.", entry.size);
+    std::snprintf(text, sizeof(text), "Disco leído: SLES_525.68, %u bytes. Iniciando el motor.", entry.size);
     g_status = text;
     LOGI("%s", text);
 }

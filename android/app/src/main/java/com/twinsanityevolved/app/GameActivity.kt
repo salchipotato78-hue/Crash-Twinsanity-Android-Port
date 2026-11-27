@@ -239,6 +239,8 @@ class GameActivity : SDLActivity() {
         engineStarted = NativeBridge.start(path, filesDir.absolutePath)
         notice.text = NativeBridge.status()
         notice.visibility = View.VISIBLE
+        // The game draws underneath: the status is for the start-up only.
+        notice.postDelayed({ notice.visibility = View.GONE }, 4000)
     }
 
     private fun showNotice(res: Int) {
