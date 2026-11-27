@@ -39,6 +39,9 @@ typedef struct te_fiber_ctx {
 #else
 #error "te_fiber: unsupported architecture"
 #endif
+#if defined(__ANDROID__)
+    void* thread_record;   /* te_fiber_android.c: the fiber's thread (its switch is not the asm one) */
+#endif
 } te_fiber_ctx;
 
 // Saves the current callee-saved state into *save and continues in *load. Returns when someone switches back to *save.
