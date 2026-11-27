@@ -6,6 +6,7 @@
 // a time, as with the switch, and every JNI call comes from a stack ART knows. map_stack hands out a token: no memory is
 // mapped (the threads have their own stacks), and unmap is a no-op.
 #include "te_fiber.h"
+#include "te_android_diag.h"
 
 #include <pthread.h>
 #include <stdio.h>
@@ -38,6 +39,7 @@ static TeThreadFiber* RecordOf(te_fiber_ctx* ctx) {   /* under g_mu */
 
 static void* ThreadMain(void* p) {
     TeThreadFiber* r = (TeThreadFiber*)p;
+    TE_DIAG_MARK("fiber: game thread running, waiting for the baton");
     pthread_mutex_lock(&g_mu);
     while (!r->go) pthread_cond_wait(&r->cv, &g_mu);
     r->go = 0;

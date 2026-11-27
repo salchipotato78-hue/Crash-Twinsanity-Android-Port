@@ -1,5 +1,6 @@
 // runner/te_android.cpp -- see te_android.h.
 #include "te_android.h"
+#include "te_android_diag.h"
 
 #include <SDL.h>
 #include <android/log.h>
@@ -25,6 +26,8 @@ void SetLaunch(const char* iso_path, const char* files_dir) {
 }
 
 void Startup(int* argc, char*** argv) {
+    te_diag_start();
+    TE_DIAG_MARK("startup: SDL events init");
     // SDL's first environment read asks the Java side for the manifest's variables (Android_JNI_GetManifestEnvironmentVariables).
     // That JNI call must run here, on SDL's own thread: from the game's fiber (a malloc'd stack that ART does not know)
     // it raises a StackOverflowError and aborts. SDL_InitSubSystem(SDL_INIT_EVENTS) runs the same first read before the fiber.
@@ -44,6 +47,7 @@ void Startup(int* argc, char*** argv) {
     g_argv.push_back(nullptr);
     *argc = static_cast<int>(g_argv.size()) - 1;
     *argv = g_argv.data();
+    TE_DIAG_MARK("startup: argv ready, handing over to main()");
     TE_ALOG("launch: argc=%d HOME=%s", *argc, std::getenv("HOME") ? std::getenv("HOME") : "(unset)");
     for (int i = 0; i < *argc; ++i) TE_ALOG("launch: argv[%d]=%s", i, (*argv)[i]);
 }

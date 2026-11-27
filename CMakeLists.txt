@@ -857,7 +857,7 @@ if(TE_ANDROID_ENGINE)
     add_library(twinsanityevolved_android SHARED
         android/native/src/twinsanityevolved_jni.cpp android/native/src/iso9660.cpp
         runner/main.cpp runner/te_android.cpp runner/te_env.cpp runner/te_run.c runner/te_startup.cpp
-        runner/te_fiber_android.c runner/te_game.cpp runner/te_savestate_null.cpp
+        runner/te_fiber_android.c runner/te_android_diag.c runner/te_game.cpp runner/te_savestate_null.cpp
         runner/te_probe.cpp runner/te_autopilot.cpp runner/te_profile.cpp runner/te_disc_log.cpp
         runner/te_region.cpp runner/te_cutscenes.cpp "${TE_ENGINE}/app/host/game_folder.cpp")
     target_include_directories(twinsanityevolved_android PRIVATE

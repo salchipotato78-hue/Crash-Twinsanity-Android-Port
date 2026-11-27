@@ -1,5 +1,6 @@
 // te_game.cpp -- see te_game.h.
 #include "te_game.h"
+#include "te_android_diag.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -42,7 +43,9 @@ void FiberMain(void*) {
 #endif
 #endif
     Fiber& f = Get();
+    TE_DIAG_MARK("game: fiber body, entering te_run_entry");
     const int trap = te_run_entry(f.instance, f.test_trap ? 1 : 0);
+    TE_DIAG_MARK("game: te_run_entry returned");
     if (trap < 0) Yield(Reason::Returned, 0);
     else Yield(Reason::Trap, trap);
     // never resumed
@@ -65,6 +68,7 @@ bool Prepare(w2c_game* instance, bool test_trap, std::string* err) {
         f.stack_size = kStackSize;
         f.at_hint = at_hint != 0;
     }
+    TE_DIAG_MARK("game: prepare (thread creation next)");
     f.instance = instance;
     f.test_trap = test_trap;
     te_fiber_prepare(&f.game, f.stack, f.stack_size, FiberMain, nullptr);
@@ -76,6 +80,7 @@ Reason Resume() {
     f.reason = Reason::Running;
     f.on_game = true;
     f.started = true;
+    TE_DIAG_MARK("host: switching to the game fiber");
     te_fiber_switch(&f.host, &f.game);
     f.on_game = false;
     return f.reason;
@@ -104,6 +109,7 @@ void Yield(Reason reason, int code, uint64_t boundary) {
     f.reason = reason;
     f.code = code;
     f.boundary = boundary;
+    TE_DIAG_MARK("game: yielding to the host");
     te_fiber_switch(&f.game, &f.host);
 }
 

@@ -49,6 +49,7 @@
 #include "te_region.h"
 #include "te_env.h"
 #include "te_game.h"
+#include "te_android_diag.h"
 #include "te_harness.h"
 #include "te_host.h"
 #include "te_display.h"
@@ -975,8 +976,13 @@ int main(int argc, char** argv) {
 #if defined(__vita__)
     te::vita::Step("entering the game fiber (module instantiated; the game's main runs next)");
 #endif
+#if defined(__ANDROID__)
+    te::Services::Get().clock().AddBoundaryHook("diag boundary", [](uint64_t b) { TE_DIAG_BOUNDARY(b); });
+#endif
     for (;;) {
+        TE_DIAG_MARK("main: resume game fiber");
         const te::game::Reason reason = te::game::Resume();
+        TE_DIAG_MARK("main: game fiber yielded");
         const te::game::Fiber& f = te::game::Get();
         if (reason == te::game::Reason::Checkpoint) {
             std::string error;
