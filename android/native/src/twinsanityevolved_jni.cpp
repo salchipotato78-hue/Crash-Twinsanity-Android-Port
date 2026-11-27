@@ -105,7 +105,11 @@ extern "C" {
 
 // SDL calls this on its own thread (SDLActivity): the desktop runner's main(), which takes the disc from the
 // descriptor nativeStart was given (te_android.cpp).
-int SDL_main(int argc, char** argv) { return te_main(argc, argv); }
+int SDL_main(int argc, char** argv) {
+    const int rc = te_main(argc, argv);
+    LOGI("SDL_main: te_main returned %d", rc);
+    return rc;
+}
 
 JNIEXPORT jboolean JNICALL
 Java_com_twinsanityevolved_app_NativeBridge_nativeStart(JNIEnv* env, jclass, jint fd, jstring filesDir) {

@@ -1,10 +1,16 @@
 // runner/te_android.cpp -- see te_android.h.
 #include "te_android.h"
 
+#include <android/log.h>
+
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
+
+#define TE_ALOG(...) __android_log_print(ANDROID_LOG_INFO, "twinsanityevolved", __VA_ARGS__)
 
 namespace te::android {
 namespace {
@@ -34,6 +40,16 @@ void Startup(int* argc, char*** argv) {
     g_argv.push_back(nullptr);
     *argc = static_cast<int>(g_argv.size()) - 1;
     *argv = g_argv.data();
+    // the launch as main() gets it: whether the descriptor's path opens here, and the folder HOME names
+    TE_ALOG("launch: argc=%d HOME=%s", *argc, std::getenv("HOME") ? std::getenv("HOME") : "(unset)");
+    for (int i = 0; i < *argc; ++i) TE_ALOG("launch: argv[%d]=%s", i, (*argv)[i]);
+    if (g_iso_fd >= 0) {
+        const std::string path = "/proc/self/fd/" + std::to_string(g_iso_fd);
+        FILE* probe = std::fopen(path.c_str(), "rb");
+        TE_ALOG("launch: %s %s (errno %d %s)", path.c_str(), probe ? "opens" : "does NOT open", errno,
+                probe ? "" : std::strerror(errno));
+        if (probe) std::fclose(probe);
+    }
 }
 
 }  // namespace te::android
