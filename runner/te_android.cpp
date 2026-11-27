@@ -3,6 +3,7 @@
 #include "te_android_diag.h"
 
 #include <SDL.h>
+#include <sys/stat.h>
 #include <android/log.h>
 
 #include <cstdio>
@@ -41,6 +42,11 @@ void Startup(int* argc, char*** argv) {
     (void)SDL_getenv("SDL_VIDEO_ALLOW_SCREENSAVER");
     SDL_InitSubSystem(SDL_INIT_EVENTS);
     if (!g_files_dir.empty()) setenv("HOME", g_files_dir.c_str(), 1);
+    if (!g_files_dir.empty()) {
+        // the engine writes ps2r.ini and the memory cards here; the folder is not created by the app
+        const std::string game_dir = g_files_dir + "/.twinsanityevolved";
+        mkdir(game_dir.c_str(), 0700);
+    }
     g_args.clear();
     g_args.push_back("twinsanityevolved");
     if (!g_iso_path.empty()) {

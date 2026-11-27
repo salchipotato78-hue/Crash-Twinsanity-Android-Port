@@ -22,6 +22,10 @@
 #endif
 
 #include "engine/render/backends/gl/gl_shader_sources.h"
+#if defined(__ANDROID__)
+#include <regex>
+#include <string>
+#endif
 #include "engine/render/backends/gl/gl_uniform_cache.h"
 #include "engine/render/backends/gl/gl_census.h"
 #include "engine/render/backends/gl/gl_fill_census.h"
@@ -238,11 +242,52 @@ const GlShaderLibrary::FastConstant* GlShaderLibrary::FastConstants(int* count) 
     return table;
 }
 
+#if defined(__ANDROID__)
+// The engine's GLSL is desktop GL 4.1 (#version 410 core). The Android context is OpenGL ES (3.1 requested; the driver
+// compiles up to 320 es), so each program is rewritten before it is compiled: the version line becomes 320 es, the
+// fragment programs get default float/int precision (required in ES), and the interpolation qualifier `noperspective`
+// is kept only when the driver exposes GL_NV_shader_noperspective_interpolation. Without that extension the qualifier
+// is dropped: the PS2 texture coordinates then interpolate perspective-correctly, which changes texturing (logged once).
+bool AndroidHasGlExtension(const char* name) {
+    static std::string all;
+    static bool made = false;
+    if (!made) {
+        const char* e = reinterpret_cast<const char*>(glGetString(GL_EXTENSIONS));
+        all = e ? e : "";
+        made = true;
+    }
+    return all.find(name) != std::string::npos;
+}
+
+std::string AndroidGlsl(uint32_t type, const char* source) {
+    static bool noted = false;
+    const bool nopersp = AndroidHasGlExtension("GL_NV_shader_noperspective_interpolation");
+    std::string s = source;
+    std::string head = "#version 320 es\n";
+    if (nopersp) head += "#extension GL_NV_shader_noperspective_interpolation : require\n";
+    if (type == GL_FRAGMENT_SHADER) head += "precision highp float;\nprecision highp int;\n";
+    s = std::regex_replace(s, std::regex(R"(#version\s+\d+\s*\w*\s*\n?)"), "");
+    if (!nopersp) {
+        s = std::regex_replace(s, std::regex(R"(\bnoperspective\s+)"), "");
+        if (!noted) {
+            noted = true;
+            std::fprintf(stderr, "[gl] GL_NV_shader_noperspective_interpolation not available: the PS2 texture coordinates "
+                                 "interpolate perspective-correctly (texturing may differ)\n");
+        }
+    }
+    return head + s;
+}
+#endif
+
 uint32_t GlShaderLibrary::CompileShader(uint32_t type, const char* source) {
     GLuint shader = glCreateShader(type);
 #if PS2R_HOST_VITA
     const std::string vita = VitaGlsl(type, source);
     source = vita.c_str();
+#endif
+#if defined(__ANDROID__)
+    const std::string android = AndroidGlsl(type, source);
+    source = android.c_str();
 #endif
     glShaderSource(shader, 1, &source, nullptr);
 #if PS2R_HOST_VITA

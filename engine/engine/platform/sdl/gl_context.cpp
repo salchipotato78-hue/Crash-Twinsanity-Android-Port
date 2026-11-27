@@ -32,8 +32,10 @@ void GlContext::RequestAttributes() {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
 #endif
-#ifdef _WIN32
-    // 24, not 32, on Windows. The accelerated ICDs (nvoglv64 / igxelpicd64)
+#if defined(_WIN32) || defined(__ANDROID__)
+    // 24, not 32, on Windows and Android. On Android the 32-bit depth config matches no EGL config on the test device
+    // (SDL_CreateWindow fails: "Couldn't find matching EGL config"), so 24 is asked for at once.
+    // On Windows the accelerated ICDs (nvoglv64 / igxelpicd64)
     // advertise 24-bit depth with 8 stencil and no 32-bit depth format at all,
     // while the Microsoft GDI Generic software renderer DOES offer 32 -- so
     // asking for 32 does not fail, it silently selects the software format and
