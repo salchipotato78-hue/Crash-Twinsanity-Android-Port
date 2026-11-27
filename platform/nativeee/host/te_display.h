@@ -47,6 +47,9 @@ void Apply();
 // The shape the game's widescreen option draws for (Platform::Graphics::WidescreenAspect): the picture's own at 16:10, 21:9
 // and 32:9; 0 at auto, 4:3 and 16:9 (a 16:9 TV's: the game draws as on the console).
 float WidescreenAspect();
+// Android: the screen's pixels, reported by the app. Auto and the wide choices (16:10, 21:9, 32:9) then draw at the
+// screen's own ratio, so the picture fills it without stretching; 0 (unknown) keeps the shapes above.
+void SetScreenSize(int width, int height);
 // One line for the log.
 std::string Describe();
 

@@ -37,12 +37,14 @@ std::atomic<bool> g_stop{false};
 std::atomic<int> g_pad{0};
 std::atomic<float> g_stickX{0.0f};
 std::atomic<float> g_stickY{0.0f};
+std::atomic<bool> g_menu{false};
 
 // The pad is a static state: a stick or button left held by a lost touch-up must not outlive its activity.
 void ResetPad() {
     g_pad.store(0);
     g_stickX.store(0.0f);
     g_stickY.store(0.0f);
+    g_menu.store(false);
 }
 
 // pread on the descriptor the app gave us: the disc is read in place, nothing is copied.
@@ -154,6 +156,24 @@ Java_com_twinsanityevolved_app_NativeBridge_nativeStop(JNIEnv*, jclass) {
     g_fd = -1;
     g_discOk = false;
     g_status = "motor detenido";
+}
+
+// The game's menu state, from the runner's boundary hook (runner/main.cpp).
+void te_android_set_menu(bool open) {
+    g_menu.store(open);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_twinsanityevolved_app_NativeBridge_nativeMenuOpen(JNIEnv*, jclass) {
+    return g_menu.load() ? JNI_TRUE : JNI_FALSE;
+}
+
+// The screen's pixels (platform/nativeee/host/display.cpp): the wide picture is drawn at this shape.
+extern "C" void te_display_set_screen(int width, int height);
+
+JNIEXPORT void JNICALL
+Java_com_twinsanityevolved_app_NativeBridge_nativeSetScreen(JNIEnv*, jclass, jint width, jint height) {
+    te_display_set_screen(width, height);
 }
 
 // The engine reads the touch overlay's last pad state through this (platform/sdl/input/android_pad_backend.cpp).

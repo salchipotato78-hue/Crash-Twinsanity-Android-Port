@@ -24,6 +24,21 @@ class TouchOverlay(context: Context) : View(context) {
     var onEdited: (() -> Unit)? = null
     var onSelectionChanged: ((Slot?) -> Unit)? = null
 
+    /**
+     * True while the game is in a menu: the controls are hidden and do nothing, and a finger swipe steps the menu
+     * (the d-pad). Taps still press Cross. In the edit mode the controls always show.
+     */
+    var menuMode = false
+        set(value) {
+            if (field == value) return
+            field = value
+            releaseAll()
+            invalidate()
+        }
+
+    /** The controls are drawn at this share of their set opacity: the picture stays visible under them. */
+    private val gameOpacity = 0.5f
+
     var editing = false
         set(value) {
             field = value
@@ -71,7 +86,7 @@ class TouchOverlay(context: Context) : View(context) {
         return RectF(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
     }
 
-    private fun hit(x: Float, y: Float): Slot? = slots.lastOrNull { s ->
+    private fun hit(x: Float, y: Float): Slot? = if (menuMode && !editing) null else slots.lastOrNull { s ->
         val r = boundsOf(s)
         hypot(x - r.centerX(), y - r.centerY()) <= r.width() / 2 * 1.15f
     }
@@ -106,9 +121,10 @@ class TouchOverlay(context: Context) : View(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
+        if (menuMode && !editing) return
         for (s in slots) {
             val r = boundsOf(s)
-            paint.alpha = (s.alpha * 255).toInt()
+            paint.alpha = (s.alpha * gameOpacity * 255).toInt()
             canvas.drawBitmap(bitmap(s.control), null, r, paint)
             if (s.control.isStick) {
                 val k = r.width() * 0.42f
@@ -190,7 +206,7 @@ class TouchOverlay(context: Context) : View(context) {
     }
 
     private fun swipe(x: Float, y: Float) {
-        if (tapPointer == -1) return
+        if (tapPointer == -1 || !menuMode) return
         if (!swiping && hypot(x - tapX, y - tapY) <= tapSlop()) return
         swiping = true
         val dx = x - swipeX

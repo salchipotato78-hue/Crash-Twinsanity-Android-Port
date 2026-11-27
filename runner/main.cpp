@@ -978,6 +978,14 @@ int main(int argc, char** argv) {
 #endif
 #if defined(__ANDROID__)
     te::Services::Get().clock().AddBoundaryHook("diag boundary", [](uint64_t b) { TE_DIAG_BOUNDARY(b); });
+    // The touch controls step back while the game is in a menu (android/native: te_android_set_menu).
+    extern "C" void te_android_set_menu(bool open);
+    te::Services::Get().clock().AddBoundaryHook("android menu", [](uint64_t) {
+        unsigned state = 0, last = 0, next = 0;
+        if (!te::harness::ReadGameState(&state, &last, &next)) return;
+        // GameController states (te_harness.cpp StateName): Title 7, MainMenu 8, NewGame 10, Paused 15, Gallery 16
+        te_android_set_menu(state == 7 || state == 8 || state == 10 || state == 15 || state == 16);
+    });
 #endif
     for (;;) {
         TE_DIAG_MARK("main: resume game fiber");

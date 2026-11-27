@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <atomic>
 #include <cstdio>
 #include <string>
 
@@ -31,6 +32,10 @@ namespace te::display {
 namespace {
 
 Settings g_settings;
+// The screen's pixels (Android: SetScreenSize); 0 until the app reports them.
+std::atomic<int> g_screen_w{0}, g_screen_h{0};
+// The choices that fill the screen at its own shape: auto (0) and the wide ones (16:10, 21:9, 32:9 = 3, 4, 5).
+bool FillsScreen(int aspect) { return aspect == 0 || aspect >= 3; }
 uint64_t g_page_polled_at = 0;   // the boundary at which the game last read a row's value (the page is open)
 using Pacer = ps2r::ps2e::PresentPacer;
 bool Uncapped() { return g_settings.frame_rate == int(Pacer::Rate::Uncapped); }
@@ -124,6 +129,11 @@ void Configure(const Settings& settings) {
 
 const Settings& Current() { return g_settings; }
 
+void SetScreenSize(int width, int height) {
+    g_screen_w.store(width);
+    g_screen_h.store(height);
+}
+
 void Apply() {
     ps2e_draw_presentation p{};
     const bool headless = gfx::Headless();
@@ -140,9 +150,9 @@ void Apply() {
     p.fit = g_settings.fit == 2 ? PS2E_DRAW_FIT_FILL : g_settings.fit == 3 ? PS2E_DRAW_FIT_INTEGER : PS2E_DRAW_FIT_LETTERBOX;
     if (g_settings.fit == 0) p.aspect = PS2E_DRAW_ASPECT_WINDOW;   // stretch
 #if defined(__ANDROID__)
-    // Android: `auto` is the window's own shape, exactly (the game's projection is built for the same ratio, see
-    // AspectSelection::Ratio): the picture fills the screen at its real shape, so more of the scene is seen, not stretched.
-    if (!headless && g_settings.aspect == 0 && g_settings.fit != 0) p.aspect = PS2E_DRAW_ASPECT_WINDOW;
+    // Android: auto and the wide choices are the window's own shape, exactly (the game's projection is built for the same
+    // ratio, see WidescreenAspect): the picture fills the screen at its real shape, so more of the scene is seen, not stretched.
+    if (!headless && g_settings.fit != 0 && FillsScreen(g_settings.aspect)) p.aspect = PS2E_DRAW_ASPECT_WINDOW;
 #endif
     p.offset_x = g_settings.offset_x;
     p.offset_y = g_settings.offset_y;
@@ -160,6 +170,12 @@ void Apply() {
 float WidescreenAspect() {
     // (made when the port is built: the game thread asks with the EE's rounding, toward zero, in force)
     constexpr float kWide16_10 = 16.0f / 10.0f, kWide21_9 = 21.0f / 9.0f, kWide32_9 = 32.0f / 9.0f;
+#if defined(__ANDROID__)
+    // The phone's own shape: the picture is drawn at the screen's ratio and fills it (the presenter fits the window at the
+    // same ratio, see Apply), so nothing is stretched and no bars are left.
+    const int sw = g_screen_w.load(), sh = g_screen_h.load();
+    if (sw > 0 && sh > 0 && FillsScreen(g_settings.aspect)) return float(sw) / float(sh);
+#endif
     switch (g_settings.aspect) {
     case 3: return kWide16_10;
     case 4: return kWide21_9;
@@ -357,6 +373,9 @@ void Set(uint32_t row, uint32_t choice) {
 }  // namespace te::display
 
 extern "C" {
+
+// Android (android/native): the screen's pixels, from the app's full-screen view.
+void te_display_set_screen(int width, int height) { te::display::SetScreenSize(width, height); }
 
 // Platform::Graphics::DisplaySetting*: the graphic options page's platform rows
 ps2e_s32 ps2e_graphics_display_setting_count(void) { return static_cast<ps2e_s32>(te::display::RowCount); }

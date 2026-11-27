@@ -53,6 +53,10 @@ class GameActivity : SDLActivity() {
             onEdited = { settings.saveSlots(slots) }
             onSelectionChanged = { s -> syncEditBars(s) }
         }
+        // The engine draws the picture at the screen's own shape (auto and the wide choices): it needs the pixels.
+        touchPad.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+            NativeBridge.setScreen(right - left, bottom - top)
+        }
         notice = TextView(this).apply {
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
@@ -87,11 +91,21 @@ class GameActivity : SDLActivity() {
                         leftMargin = dp(8)
                     }
                 )
-                addView(editPanel, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.BOTTOM))
+                addView(editPanel, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.TOP).apply { topMargin = dp(56) })
             },
             FrameLayout.LayoutParams(MATCH, MATCH)
         )
+        touchPad.postDelayed(menuWatch, 100)
         openDisc()
+    }
+
+    /** The game's menu state, read ten times a second: the touch controls step back while a menu is open. */
+    private val menuWatch = object : Runnable {
+        override fun run() {
+            val open = NativeBridge.menuOpen()
+            if (open != touchPad.menuMode) touchPad.menuMode = open
+            touchPad.postDelayed(this, 100)
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -266,6 +280,7 @@ class GameActivity : SDLActivity() {
     }
 
     override fun onDestroy() {
+        touchPad.removeCallbacks(menuWatch)
         if (engineStarted) NativeBridge.stop()
         engineStarted = false
         super.onDestroy()
