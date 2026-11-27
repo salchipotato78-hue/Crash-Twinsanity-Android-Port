@@ -43,6 +43,9 @@
 #include "savestate.h"
 #include "te_audio.h"
 #include "te_disc_log.h"
+#if defined(__ANDROID__)
+#include "te_android.h"
+#endif
 #include "te_region.h"
 #include "te_env.h"
 #include "te_game.h"
@@ -151,6 +154,8 @@ int main(int argc, char** argv) {
     te::startup::AttachParentConsole();
 #if defined(__vita__)
     te::vita::Startup(&argc, &argv);
+#elif defined(__ANDROID__)
+    te::android::Startup(&argc, &argv);
 #endif
     te::profile::StartFromEnvironment();
     std::string iso, elf_path, elf_in_iso = "SLES_525.68";

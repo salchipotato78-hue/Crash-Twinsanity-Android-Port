@@ -13,6 +13,7 @@
 #include <string>
 
 #include "iso9660.h"
+#include "te_android.h"
 
 #if defined(TE_HAVE_FFMPEG)
 // FFmpeg's headers have no extern "C" guards of their own: without this wrapper the calls below are C++-mangled and
@@ -94,25 +95,27 @@ void CheckDisc() {
 
 }  // namespace
 
+// runner/main.cpp, compiled with main renamed to te_main: C++ linkage, so declared outside the C block
+int te_main(int argc, char** argv);
+
 extern "C" {
 
 // SDL calls this on its own thread (SDLActivity). The engine's main goes here once it is linked; for now it keeps
 // the activity alive until the player leaves.
-int SDL_main(int, char**) {
-    LOGI("SDL_main: engine not linked yet; waiting");
-    while (!g_stop.load()) {
-        SDL_Delay(100);
-    }
-    LOGI("SDL_main: done");
-    return 0;
-}
+
+// SDL calls this on its own thread (SDLActivity): the desktop runner's main(), which takes the disc from the
+// descriptor nativeStart was given (te_android.cpp).
+int SDL_main(int argc, char** argv) { return te_main(argc, argv); }
 
 JNIEXPORT jboolean JNICALL
-Java_com_twinsanityevolved_app_NativeBridge_nativeStart(JNIEnv*, jclass, jint fd) {
+Java_com_twinsanityevolved_app_NativeBridge_nativeStart(JNIEnv* env, jclass, jint fd, jstring filesDir) {
     std::lock_guard<std::mutex> lock(g_lock);
     if (g_fd >= 0) close(g_fd);
     g_fd = fd;
     g_stop.store(false);
+    const char* dir = env->GetStringUTFChars(filesDir, nullptr);
+    te::android::SetLaunch(fd, dir);
+    env->ReleaseStringUTFChars(filesDir, dir);
     CheckDisc();
     const std::string ffmpeg = FfmpegCheck();
     LOGI("%s", ffmpeg.c_str());

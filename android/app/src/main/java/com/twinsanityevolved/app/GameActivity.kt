@@ -246,7 +246,7 @@ class GameActivity : SDLActivity() {
             showNotice(R.string.disc_open_failed)
             return
         }
-        engineStarted = NativeBridge.start(fd)
+        engineStarted = NativeBridge.start(fd, filesDir.absolutePath)
         // Shows what the native side found on the disc (the executable, or why it failed).
         notice.text = NativeBridge.status()
         notice.visibility = View.VISIBLE

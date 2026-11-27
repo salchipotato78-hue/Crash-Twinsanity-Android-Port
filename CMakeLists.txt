@@ -851,10 +851,15 @@ add_dependencies(twinsanityevolved nativeee)
 # JNI entry (android/native/src) in place of the desktop main(). Build it with --target twinsanityevolved_android.
 set(TE_ANDROID_JNILIBS "" CACHE PATH "Where libtwinsanityevolved.so and libSDL2.so are copied (the app's jniLibs/arm64-v8a)")
 if(TE_ANDROID_ENGINE)
+    # the desktop runner's sources (as twinsanityevolved above) with the Android launch hook; main() is renamed te_main
+    # in that one file, for the JNI entry (SDL_main) to call. The save-state runner refuses (no second process here).
+    set_source_files_properties(runner/main.cpp PROPERTIES COMPILE_DEFINITIONS "main=te_main")
     add_library(twinsanityevolved_android SHARED
         android/native/src/twinsanityevolved_jni.cpp android/native/src/iso9660.cpp
-        runner/te_env.cpp runner/te_run.c runner/te_startup.cpp runner/te_fiber.c ${TE_FIBER_SWITCH}
-        runner/te_game.cpp runner/te_android_host.cpp "${TE_ENGINE}/app/host/game_folder.cpp")
+        runner/main.cpp runner/te_android.cpp runner/te_env.cpp runner/te_run.c runner/te_startup.cpp
+        runner/te_fiber.c ${TE_FIBER_SWITCH} runner/te_game.cpp runner/te_savestate_null.cpp
+        runner/te_probe.cpp runner/te_autopilot.cpp runner/te_profile.cpp runner/te_disc_log.cpp
+        runner/te_region.cpp runner/te_cutscenes.cpp "${TE_ENGINE}/app/host/game_folder.cpp")
     target_include_directories(twinsanityevolved_android PRIVATE
         "${CMAKE_SOURCE_DIR}/android/native/src" "${CMAKE_SOURCE_DIR}/runner" "${CMAKE_SOURCE_DIR}/platform/nativeee/host")
     target_compile_options(twinsanityevolved_android PRIVATE -Wall -Wextra)
