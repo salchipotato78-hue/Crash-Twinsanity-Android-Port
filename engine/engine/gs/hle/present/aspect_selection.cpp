@@ -41,7 +41,12 @@ double AspectSelection::Ratio() const {
     if (packed == 0) return kNarrow;
     const double w = static_cast<double>(static_cast<uint32_t>(packed >> 32));
     const double h = static_cast<double>(static_cast<uint32_t>(packed & 0xFFFFFFFFu));
+#if defined(__ANDROID__)
+    // Android: the window's exact ratio. The picture is shown at this shape (display.cpp), so the projection must match it.
+    return h > 0.0 ? w / h : kNarrow;
+#else
     return Snap(w / h);
+#endif
 }
 
 const char* AspectSelection::Name(double ratio) {

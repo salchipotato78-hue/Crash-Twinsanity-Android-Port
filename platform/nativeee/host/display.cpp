@@ -139,6 +139,11 @@ void Apply() {
     }
     p.fit = g_settings.fit == 2 ? PS2E_DRAW_FIT_FILL : g_settings.fit == 3 ? PS2E_DRAW_FIT_INTEGER : PS2E_DRAW_FIT_LETTERBOX;
     if (g_settings.fit == 0) p.aspect = PS2E_DRAW_ASPECT_WINDOW;   // stretch
+#if defined(__ANDROID__)
+    // Android: `auto` is the window's own shape, exactly (the game's projection is built for the same ratio, see
+    // AspectSelection::Ratio): the picture fills the screen at its real shape, so more of the scene is seen, not stretched.
+    if (!headless && g_settings.aspect == 0 && g_settings.fit != 0) p.aspect = PS2E_DRAW_ASPECT_WINDOW;
+#endif
     p.offset_x = g_settings.offset_x;
     p.offset_y = g_settings.offset_y;
     p.nearest = 0;
