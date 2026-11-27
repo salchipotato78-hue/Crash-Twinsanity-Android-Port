@@ -1,6 +1,7 @@
 // runner/te_android.cpp -- see te_android.h.
 #include "te_android.h"
 
+#include <SDL.h>
 #include <android/log.h>
 
 #include <cstdio>
@@ -24,6 +25,11 @@ void SetLaunch(const char* iso_path, const char* files_dir) {
 }
 
 void Startup(int* argc, char*** argv) {
+    // SDL's first environment read asks the Java side for the manifest's variables (Android_JNI_GetManifestEnvironmentVariables).
+    // That JNI call must run here, on SDL's own thread: from the game's fiber (a malloc'd stack that ART does not know)
+    // it raises a StackOverflowError and aborts. SDL_InitSubSystem(SDL_INIT_EVENTS) runs the same first read before the fiber.
+    (void)SDL_getenv("SDL_VIDEO_ALLOW_SCREENSAVER");
+    SDL_InitSubSystem(SDL_INIT_EVENTS);
     if (!g_files_dir.empty()) setenv("HOME", g_files_dir.c_str(), 1);
     g_args.clear();
     g_args.push_back("twinsanityevolved");
