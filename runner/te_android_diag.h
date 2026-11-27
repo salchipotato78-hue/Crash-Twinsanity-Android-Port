@@ -11,6 +11,7 @@ extern "C" {
 void te_diag_start(void);                     /* starts the watchdog (once) */
 void te_diag_mark(const char* step);          /* records and logs a step; any thread */
 void te_diag_boundary(uint64_t boundary);     /* the game's frame boundary counter */
+void te_diag_capture_stdio(void);           /* stdout/stderr -> logcat (tag TE_STDIO) */
 #ifdef __cplusplus
 }
 #endif

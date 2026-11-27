@@ -3,6 +3,7 @@
 
 #include <android/log.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <sys/syscall.h>
 #include <time.h>
 #include <unistd.h>
@@ -67,5 +68,54 @@ void te_diag_start(void) {
     pthread_t t;
     if (pthread_create(&t, &attr, Watchdog, NULL) != 0)
         __android_log_print(ANDROID_LOG_WARN, TE_DIAG_TAG, "watchdog: cannot start");
+    pthread_attr_destroy(&attr);
+}
+
+// The engine writes its own diagnostics with fprintf(stderr) (the presenter, the GL binding, the picture log). SDL's
+// Android build does not forward those to logcat, so they never show up. Point both streams at a pipe and forward
+// each line from a reader thread; no JNI on this thread.
+static void* StdioReader(void* arg) {
+    const int fd = (int)(intptr_t)arg;
+    char line[1024];
+    size_t n = 0;
+    char buf[512];
+    ssize_t r;
+    while ((r = read(fd, buf, sizeof buf)) > 0) {
+        for (ssize_t i = 0; i < r; ++i) {
+            if (buf[i] == '\n' || n == sizeof line - 1) {
+                line[n] = 0;
+                __android_log_print(ANDROID_LOG_INFO, "TE_STDIO", "%s", line);
+                n = 0;
+            } else {
+                line[n++] = buf[i];
+            }
+        }
+    }
+    if (n) {
+        line[n] = 0;
+        __android_log_print(ANDROID_LOG_INFO, "TE_STDIO", "%s", line);
+    }
+    return NULL;
+}
+
+void te_diag_capture_stdio(void) {
+    static int done = 0;
+    if (__atomic_exchange_n(&done, 1, __ATOMIC_ACQ_REL)) return;
+    int p[2];
+    if (pipe(p) != 0) {
+        __android_log_print(ANDROID_LOG_WARN, TE_DIAG_TAG, "stdio capture: pipe failed");
+        return;
+    }
+    dup2(p[1], STDOUT_FILENO);
+    dup2(p[1], STDERR_FILENO);
+    close(p[1]);
+    setvbuf(stderr, NULL, _IONBF, 0);
+    setvbuf(stdout, NULL, _IOLBF, 0);
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_t t;
+    if (pthread_create(&t, &attr, StdioReader, (void*)(intptr_t)p[0]) != 0)
+        __android_log_print(ANDROID_LOG_WARN, TE_DIAG_TAG, "stdio capture: reader thread failed");
     pthread_attr_destroy(&attr);
 }

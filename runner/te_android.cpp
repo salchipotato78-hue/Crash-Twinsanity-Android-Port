@@ -27,6 +27,7 @@ void SetLaunch(const char* iso_path, const char* files_dir) {
 
 void Startup(int* argc, char*** argv) {
     te_diag_start();
+    te_diag_capture_stdio();
     TE_DIAG_MARK("startup: SDL events init");
     // The game window asks SDL for a resizable window; SDL then requests SCREEN_ORIENTATION_FULL_USER (13), which lets
     // the activity rotate on its own. Two rotations land during the first frames (onConfigurationChanged to portrait and
