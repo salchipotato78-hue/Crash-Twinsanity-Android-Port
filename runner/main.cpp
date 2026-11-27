@@ -60,6 +60,11 @@
 #include "te_mods.h"
 #include "te_autopilot.h"
 #include "te_probe.h"
+#if defined(__ANDROID__)
+// android/native/src/twinsanityevolved_jni.cpp: the game is in a menu (the app hides the touch controls). A C function, so
+// its declaration sits at file scope (a linkage specification cannot be inside a function).
+extern "C" void te_android_set_menu(bool open);
+#endif
 #include "te_cutscenes.h"
 #include "te_test_requests.h"
 #include "te_profile.h"
@@ -979,7 +984,6 @@ int main(int argc, char** argv) {
 #if defined(__ANDROID__)
     te::Services::Get().clock().AddBoundaryHook("diag boundary", [](uint64_t b) { TE_DIAG_BOUNDARY(b); });
     // The touch controls step back while the game is in a menu (android/native: te_android_set_menu).
-    extern "C" void te_android_set_menu(bool open);
     te::Services::Get().clock().AddBoundaryHook("android menu", [](uint64_t) {
         unsigned state = 0, last = 0, next = 0;
         if (!te::harness::ReadGameState(&state, &last, &next)) return;
