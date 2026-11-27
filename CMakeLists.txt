@@ -500,6 +500,8 @@ if(TE_ANDROID_ENGINE)
     set(CMAKE_DISABLE_FIND_PACKAGE_SDL2 ON)
     # SDL2 as libSDL2.so, at the release the app's SDLActivity Java is taken from (android.yml fetches release-2.32.10)
     set(PS2R_SDL2_SHARED ON)
+    # the root's own fetch (the libSDL2.so copied into the app) must be the same release as the Java side
+    set(PS2R_SDL2_FETCH_TAG "release-2.32.10" CACHE STRING "SDL2 git tag used by PS2R_FETCH_SDL2" FORCE)
     list(APPEND TE_ENGINE_FORWARDED_ARGS -DPS2R_FETCH_SDL2=ON -DCMAKE_DISABLE_FIND_PACKAGE_SDL2=ON
          -DPS2R_SDL2_SHARED=ON -DPS2R_SDL2_FETCH_TAG=release-2.32.10)
     # the engine's own FFmpeg finder reads the same NDK build (FindFFmpeg.cmake: its cache entries are these)
