@@ -2,6 +2,7 @@ package com.twinsanityevolved.app
 
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
@@ -15,6 +16,7 @@ import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import org.libsdl.app.SDLActivity
+import java.io.File
 import kotlin.math.roundToInt
 
 /**
@@ -237,19 +239,47 @@ class GameActivity : SDLActivity() {
             showNotice(R.string.engine_missing)
             return
         }
-        val fd = try {
-            contentResolver.openFileDescriptor(uri, "r")?.detachFd()
-        } catch (e: Exception) {
-            null
-        }
-        if (fd == null) {
-            showNotice(R.string.disc_open_failed)
-            return
-        }
-        engineStarted = NativeBridge.start(fd, filesDir.absolutePath)
-        // Shows what the native side found on the disc (the executable, or why it failed).
-        notice.text = NativeBridge.status()
+        notice.text = "Preparando el disco (la primera vez se copia a la app)…"
         notice.visibility = View.VISIBLE
+        Thread {
+            val path = try {
+                importDisc(uri)
+            } catch (e: Exception) {
+                null
+            }
+            runOnUiThread {
+                if (path == null) {
+                    showNotice(R.string.disc_open_failed)
+                    return@runOnUiThread
+                }
+                engineStarted = NativeBridge.start(path, filesDir.absolutePath)
+                // Shows what the native side found on the disc (the executable, or why it failed).
+                notice.text = NativeBridge.status()
+                notice.visibility = View.VISIBLE
+            }
+        }.start()
+    }
+
+    /**
+     * The disc copied into the app's own folder. A content descriptor cannot be reopened by path, so the engine reads
+     * a copy; the copy is kept, and only copied again when its size differs from the picked disc.
+     */
+    private fun importDisc(uri: Uri): String? {
+        val size = contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: -1L
+        if (size <= 0L) return null
+        val target = File(filesDir, "disc.iso")
+        if (target.exists() && target.length() == size) return target.absolutePath
+        val part = File(filesDir, "disc.iso.part")
+        contentResolver.openInputStream(uri)?.use { input ->
+            part.outputStream().use { out -> input.copyTo(out, 1 shl 20) }
+        } ?: return null
+        if (part.length() != size) {
+            part.delete()
+            return null
+        }
+        if (target.exists()) target.delete()
+        if (!part.renameTo(target)) return null
+        return target.absolutePath
     }
 
     private fun showNotice(res: Int) {

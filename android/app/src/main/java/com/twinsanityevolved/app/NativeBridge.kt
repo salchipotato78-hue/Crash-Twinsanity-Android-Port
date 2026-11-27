@@ -14,13 +14,13 @@ object NativeBridge {
         false
     }
 
-    @JvmStatic private external fun nativeStart(isoFd: Int, filesDir: String): Boolean
+    @JvmStatic private external fun nativeStart(isoPath: String, filesDir: String): Boolean
     @JvmStatic private external fun nativeSetPad(bits: Int, lx: Float, ly: Float)
     @JvmStatic private external fun nativeStop()
     @JvmStatic private external fun nativeStatus(): String
 
     /** Opens the disc (the file descriptor is handed over) and checks it. */
-    fun start(isoFd: Int, filesDir: String): Boolean = available && nativeStart(isoFd, filesDir)
+    fun start(isoPath: String, filesDir: String): Boolean = available && nativeStart(isoPath, filesDir)
 
     /** Pad state: buttons as Pad bits, the left stick from -1..1 (y up positive). */
     fun setPad(bits: Int, lx: Float, ly: Float) {

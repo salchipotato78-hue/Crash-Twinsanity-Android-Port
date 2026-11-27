@@ -5,6 +5,7 @@
 #include <SDL.h>
 #include <android/log.h>
 #include <jni.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -112,14 +113,16 @@ int SDL_main(int argc, char** argv) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_twinsanityevolved_app_NativeBridge_nativeStart(JNIEnv* env, jclass, jint fd, jstring filesDir) {
+Java_com_twinsanityevolved_app_NativeBridge_nativeStart(JNIEnv* env, jclass, jstring isoPath, jstring filesDir) {
     std::lock_guard<std::mutex> lock(g_lock);
     if (g_fd >= 0) close(g_fd);
-    g_fd = fd;
-    g_stop.store(false);
+    const char* iso = env->GetStringUTFChars(isoPath, nullptr);
     const char* dir = env->GetStringUTFChars(filesDir, nullptr);
-    te::android::SetLaunch(fd, dir);
+    g_fd = open(iso, O_RDONLY);
+    te::android::SetLaunch(iso, dir);   // copies the strings
+    env->ReleaseStringUTFChars(isoPath, iso);
     env->ReleaseStringUTFChars(filesDir, dir);
+    g_stop.store(false);
     CheckDisc();
     const std::string ffmpeg = FfmpegCheck();
     LOGI("%s", ffmpeg.c_str());
