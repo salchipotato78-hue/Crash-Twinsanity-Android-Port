@@ -28,6 +28,12 @@ void SetLaunch(const char* iso_path, const char* files_dir) {
 void Startup(int* argc, char*** argv) {
     te_diag_start();
     TE_DIAG_MARK("startup: SDL events init");
+    // The game window asks SDL for a resizable window; SDL then requests SCREEN_ORIENTATION_FULL_USER (13), which lets
+    // the activity rotate on its own. Two rotations land during the first frames (onConfigurationChanged to portrait and
+    // back): SDL resizes its surface, the EGL window surface goes stale, and the first eglSwapBuffers/eglMakeCurrent
+    // blocks in libEGL for 30 s (the game thread waits on it). The game is landscape-only (AndroidManifest:
+    // sensorLandscape), so pin the orientation to landscape before the window exists.
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
     // SDL's first environment read asks the Java side for the manifest's variables (Android_JNI_GetManifestEnvironmentVariables).
     // That JNI call must run here, on SDL's own thread: from the game's fiber (a malloc'd stack that ART does not know)
     // it raises a StackOverflowError and aborts. SDL_InitSubSystem(SDL_INIT_EVENTS) runs the same first read before the fiber.
