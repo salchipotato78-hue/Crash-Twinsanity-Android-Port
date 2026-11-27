@@ -45,6 +45,9 @@
 #include "engine/platform/vita/fiber_vita.h"
 #else
 #include "engine/platform/posix/fiber_posix.h"
+#if defined(__ANDROID__)
+#include "engine/platform/android/fiber_android.h"
+#endif
 #endif
 
 namespace ps2r::host {
@@ -478,6 +481,8 @@ std::string SymbolForAddress(const void* pc) {
 
 #if defined(__vita__)
 using HostFiber = platform::FiberVita;
+#elif defined(__ANDROID__)
+using HostFiber = platform::FiberAndroid;
 #else
 using HostFiber = platform::FiberPosix;
 #endif

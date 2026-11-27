@@ -852,7 +852,7 @@ if(TE_ANDROID_ENGINE)
     add_library(twinsanityevolved_android SHARED
         android/native/src/twinsanityevolved_jni.cpp android/native/src/iso9660.cpp
         runner/te_env.cpp runner/te_run.c runner/te_startup.cpp runner/te_fiber.c ${TE_FIBER_SWITCH}
-        runner/te_game.cpp "${TE_ENGINE}/app/host/game_folder.cpp")
+        runner/te_game.cpp runner/te_android_host.cpp "${TE_ENGINE}/app/host/game_folder.cpp")
     target_include_directories(twinsanityevolved_android PRIVATE
         "${CMAKE_SOURCE_DIR}/android/native/src" "${CMAKE_SOURCE_DIR}/runner" "${CMAKE_SOURCE_DIR}/platform/nativeee/host")
     target_compile_options(twinsanityevolved_android PRIVATE -Wall -Wextra)
