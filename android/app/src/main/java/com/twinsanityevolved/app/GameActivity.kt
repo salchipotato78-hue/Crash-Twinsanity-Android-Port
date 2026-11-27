@@ -51,6 +51,7 @@ class GameActivity : SDLActivity() {
             slots = settings.loadSlots()
             onPad = { bits, lx, ly -> NativeBridge.setPad(bits, lx, ly) }
             onEdited = { settings.saveSlots(slots) }
+            onLook = { dx, dy -> NativeBridge.look(dx, dy) }
             onSelectionChanged = { s -> syncEditBars(s) }
         }
         // The engine draws the picture at the screen's own shape (auto and the wide choices): it needs the pixels.

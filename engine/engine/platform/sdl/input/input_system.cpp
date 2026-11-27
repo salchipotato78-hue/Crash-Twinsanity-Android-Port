@@ -147,6 +147,11 @@ PadSample InputSystem::Frame(float dt_seconds) {
         NormalizedInput one;
         be->Poll(one);
         if (be == kbm_.get() && !kbm_enabled_) continue;   // polled, discarded
+#if defined(__ANDROID__)
+        // On the phone the only stick is the touch one: a keyboard's keys or a controller's axes never move Crash
+        // (their buttons still count).
+        if (be != android_pad_.get()) { one.lx = one.ly = one.rx = one.ry = 0.f; }
+#endif
         merged.buttons |= one.buttons;
         merged.lx = Pick(merged.lx, one.lx);
         merged.ly = Pick(merged.ly, one.ly);

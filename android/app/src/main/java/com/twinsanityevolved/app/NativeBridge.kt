@@ -20,6 +20,7 @@ object NativeBridge {
     @JvmStatic private external fun nativeStatus(): String
     @JvmStatic private external fun nativeMenuOpen(): Boolean
     @JvmStatic private external fun nativeSetScreen(width: Int, height: Int)
+    @JvmStatic private external fun nativeLook(dx: Float, dy: Float)
 
     /** Opens the disc (the file descriptor is handed over) and checks it. */
     fun start(isoPath: String, filesDir: String): Boolean = available && nativeStart(isoPath, filesDir)
@@ -31,6 +32,11 @@ object NativeBridge {
 
     fun stop() {
         if (available) nativeStop()
+    }
+
+    /** A finger's drag in the game, in dp: the camera turns by it (taken by the engine once a frame). */
+    fun look(dx: Float, dy: Float) {
+        if (available) nativeLook(dx, dy)
     }
 
     /** The screen's pixels: auto and the wide choices draw at this shape, so the picture fills the screen. */

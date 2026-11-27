@@ -11,8 +11,10 @@ android {
         applicationId = "com.twinsanityevolved.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        // Bumped with the icon change: the launcher keeps the icon it cached for a version, so an update under the same
+        // version can keep showing the old one.
+        versionCode = 2
+        versionName = "0.1.1"
     }
 
     buildTypes {

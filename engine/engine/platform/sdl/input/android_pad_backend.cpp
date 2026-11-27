@@ -6,6 +6,8 @@
 #if defined(__ANDROID__)
 // Defined in android/native/src/twinsanityevolved_jni.cpp (the same library): the last pad state the touch overlay sent.
 extern "C" void te_android_pad_read(uint32_t* bits, float* lx, float* ly);
+// The finger's drag since the last take, in dp (android/native): the camera's mouse look.
+extern "C" void te_android_look_take(float* dx, float* dy);
 #endif
 
 namespace ps2r::platform::sdl {
@@ -18,6 +20,8 @@ constexpr uint32_t kJavaCross = 1, kJavaCircle = 2, kJavaSquare = 4, kJavaTriang
 constexpr uint32_t kJavaUp = 128, kJavaDown = 256, kJavaLeft = 512, kJavaRight = 1024;
 // A push past half-way on the stick is also a d-pad press: the PS2 menus read the d-pad.
 constexpr float kDpadThreshold = 0.5f;
+// The mapper reads mouse deltas as pixels (0.35 stick units per 100 px): one dp of drag is a mouse pixel.
+constexpr float kLookPixelsPerDp = 1.0f;
 }  // namespace
 
 bool AndroidPadBackend::IsActive() const {
@@ -51,6 +55,12 @@ void AndroidPadBackend::Poll(NormalizedInput& out) {
     if (ly >  kDpadThreshold) b |= kBtnUp;
     if (ly < -kDpadThreshold) b |= kBtnDown;
     out.buttons |= b;
+
+    // The drag turns the camera: a mouse delta, the mapper's look (mouse = right stick) with its own decay.
+    float look_dx = 0.f, look_dy = 0.f;
+    te_android_look_take(&look_dx, &look_dy);
+    out.mouse_dx += look_dx * kLookPixelsPerDp;
+    out.mouse_dy += look_dy * kLookPixelsPerDp;
 
     // NormalizedInput's sticks run y DOWN positive: the Java y-up value is negated here.
     out.lx = lx;

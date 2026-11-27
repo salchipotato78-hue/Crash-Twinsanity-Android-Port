@@ -24,6 +24,11 @@
 
 #if TE_HAVE_SDL_INPUT
 #include <SDL.h>
+#if defined(__ANDROID__)
+#include <android/log.h>
+// The touch overlay's last pad state (android/native/src/twinsanityevolved_jni.cpp): diagnostics only.
+extern "C" void te_android_pad_read(uint32_t* bits, float* lx, float* ly);
+#endif
 
 #include "engine/platform/sdl/input/gamepad_backend.h"
 #include "engine/platform/sdl/input/gamepad_convert.h"
@@ -368,6 +373,26 @@ bool Install(Pads& pads, const Settings& settings) {
         s.connected = g_input->Connected() || te::GetSettings().pad_connected;
         s.buttons = p.buttons;
         s.lx = p.lx; s.ly = p.ly; s.rx = p.rx; s.ry = p.ry;
+#if defined(__ANDROID__)
+        {
+            // Diagnostic (logcat, change-only): what the game is fed, and from where. A walk with no touch shows here.
+            static uint32_t lastButtons = 0xFFFFFFFFu, lastTouch = 0xFFFFFFFFu;
+            static uint8_t lastLx = 0, lastLy = 0;
+            static int lastKeys = -1;
+            uint32_t tb = 0;
+            float tlx = 0.f, tly = 0.f;
+            te_android_pad_read(&tb, &tlx, &tly);
+            int numkeys = 0, down = 0;
+            const Uint8* ks = SDL_GetKeyboardState(&numkeys);
+            for (int i = 0; ks && i < numkeys; ++i) down += ks[i] != 0;
+            if (p.buttons != lastButtons || tb != lastTouch || p.lx != lastLx || p.ly != lastLy || down != lastKeys) {
+                lastButtons = p.buttons; lastTouch = tb; lastLx = p.lx; lastLy = p.ly; lastKeys = down;
+                __android_log_print(ANDROID_LOG_INFO, "twinsanityevolved",
+                    "[android-input] pad buttons=0x%04x lx=%u ly=%u | touch bits=0x%x stick=(%.2f,%.2f) | keys down=%d",
+                    p.buttons, p.lx, p.ly, tb, tlx, tly, down);
+            }
+        }
+#endif
 #if defined(__vita__)
         if (g_vpad.on && g_vpad.check_every && g_vpad.reads % g_vpad.check_every == 0) {
             CheckVitaPad(g_vpad);

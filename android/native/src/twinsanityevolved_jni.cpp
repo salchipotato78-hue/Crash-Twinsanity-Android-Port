@@ -38,6 +38,8 @@ std::atomic<int> g_pad{0};
 std::atomic<float> g_stickX{0.0f};
 std::atomic<float> g_stickY{0.0f};
 std::atomic<bool> g_menu{false};
+std::mutex g_lookLock;          // the finger's drag since the engine last took it (UI thread writes, game thread takes)
+float g_lookDx = 0.0f, g_lookDy = 0.0f;
 
 // The pad is a static state: a stick or button left held by a lost touch-up must not outlive its activity.
 void ResetPad() {
@@ -45,6 +47,8 @@ void ResetPad() {
     g_stickX.store(0.0f);
     g_stickY.store(0.0f);
     g_menu.store(false);
+    std::lock_guard<std::mutex> look(g_lookLock);
+    g_lookDx = g_lookDy = 0.0f;
 }
 
 // pread on the descriptor the app gave us: the disc is read in place, nothing is copied.
@@ -174,6 +178,21 @@ extern "C" void te_display_set_screen(int width, int height);
 JNIEXPORT void JNICALL
 Java_com_twinsanityevolved_app_NativeBridge_nativeSetScreen(JNIEnv*, jclass, jint width, jint height) {
     te_display_set_screen(width, height);
+}
+
+JNIEXPORT void JNICALL
+Java_com_twinsanityevolved_app_NativeBridge_nativeLook(JNIEnv*, jclass, jfloat dx, jfloat dy) {
+    std::lock_guard<std::mutex> look(g_lookLock);
+    g_lookDx += dx;
+    g_lookDy += dy;
+}
+
+// The finger's drag since the last take (platform/sdl/input/android_pad_backend.cpp): the camera's mouse look.
+void te_android_look_take(float* dx, float* dy) {
+    std::lock_guard<std::mutex> look(g_lookLock);
+    *dx = g_lookDx;
+    *dy = g_lookDy;
+    g_lookDx = g_lookDy = 0.0f;
 }
 
 // The engine reads the touch overlay's last pad state through this (platform/sdl/input/android_pad_backend.cpp).

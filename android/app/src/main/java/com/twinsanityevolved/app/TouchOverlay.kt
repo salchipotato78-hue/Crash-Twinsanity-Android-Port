@@ -23,6 +23,8 @@ class TouchOverlay(context: Context) : View(context) {
     var onPad: ((bits: Int, lx: Float, ly: Float) -> Unit)? = null
     var onEdited: (() -> Unit)? = null
     var onSelectionChanged: ((Slot?) -> Unit)? = null
+    /** A finger drag in the game (not a menu): the camera turns by this many dp (the engine's mouse look). */
+    var onLook: ((dx: Float, dy: Float) -> Unit)? = null
 
     /**
      * True while the game is in a menu: the controls are hidden and do nothing, and a finger swipe steps the menu
@@ -111,6 +113,7 @@ class TouchOverlay(context: Context) : View(context) {
         pointerOwner.clear()
         stickVector.set(0f, 0f)
         tapPointer = -1
+        swiping = false
         dragging = false
         pulseBits = 0
         publish()
@@ -153,7 +156,10 @@ class TouchOverlay(context: Context) : View(context) {
                 val s = hit(e.getX(i), e.getY(i))
                 if (s != null) {
                     pointerOwner[e.getPointerId(i)] = s
-                    if (s.control.isStick) moveStick(s, e.getX(i), e.getY(i))
+                    if (s.control.isStick) {
+                        stickDown.set(e.getX(i), e.getY(i))   // the stick measures from where the finger landed
+                        moveStick(s, e.getX(i), e.getY(i))
+                    }
                 } else {
                     startTap(e.getPointerId(i), e.getX(i), e.getY(i))
                 }
@@ -206,9 +212,21 @@ class TouchOverlay(context: Context) : View(context) {
     }
 
     private fun swipe(x: Float, y: Float) {
-        if (tapPointer == -1 || !menuMode) return
-        if (!swiping && hypot(x - tapX, y - tapY) <= tapSlop()) return
-        swiping = true
+        if (tapPointer == -1) return
+        if (!swiping) {
+            if (hypot(x - tapX, y - tapY) <= tapSlop()) return
+            swiping = true
+            swipeX = x; swipeY = y
+            return
+        }
+        if (!menuMode) {
+            // In the game the drag turns the camera: the finger's movement, as the engine's mouse look.
+            val dx = (x - swipeX) / density
+            val dy = (y - swipeY) / density
+            swipeX = x; swipeY = y
+            onLook?.invoke(dx, dy)
+            return
+        }
         val dx = x - swipeX
         val dy = y - swipeY
         val stride = swipeStride()
@@ -239,12 +257,18 @@ class TouchOverlay(context: Context) : View(context) {
         if (s.control.isStick) stickVector.set(0f, 0f)
     }
 
+    // The stick measures from where the finger landed, not from the control's centre: a thumb resting on the stick
+    // (off centre) does not walk Crash. A dead zone ignores the small wobble of a finger that has not moved.
+    private val stickDown = PointF()
     private fun moveStick(s: Slot, px: Float, py: Float) {
-        val r = boundsOf(s)
-        val radius = r.width() / 2
-        val dx = (px - r.centerX()) / radius
-        val dy = (py - r.centerY()) / radius
+        val radius = boundsOf(s).width() / 2
+        val dx = (px - stickDown.x) / radius
+        val dy = (py - stickDown.y) / radius
         val len = hypot(dx, dy)
+        if (len < 0.15f) {
+            stickVector.set(0f, 0f)
+            return
+        }
         val k = if (len > 1f) 1f / len else 1f
         stickVector.set(dx * k, dy * k)
     }
