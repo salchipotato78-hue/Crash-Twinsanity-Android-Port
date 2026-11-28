@@ -1,5 +1,6 @@
 package com.twinsanityevolved.app
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
@@ -32,6 +33,8 @@ class GameActivity : SDLActivity() {
     private lateinit var settings: AppSettings
     private lateinit var touchPad: TouchOverlay
     private lateinit var menuPanel: LinearLayout
+    /** The main menu scrolls: the list can be longer than the screen. The wrapper is what shows and hides. */
+    private lateinit var menuScroll: ScrollView
     private lateinit var editPanel: LinearLayout
     private lateinit var controllerPanel: LinearLayout
     private lateinit var mapPanel: ScrollView
@@ -83,11 +86,15 @@ class GameActivity : SDLActivity() {
             alpha = 0.6f
             setPadding(dp(14), dp(4), dp(14), dp(4))
             setOnClickListener {
-                menuPanel.visibility =
-                    if (menuPanel.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+                menuScroll.visibility =
+                    if (menuScroll.visibility == View.VISIBLE) View.GONE else View.VISIBLE
             }
         }
         menuPanel = buildMenu()
+        menuScroll = ScrollView(this).apply {
+            visibility = View.GONE
+            addView(menuPanel)
+        }
         editPanel = buildEditPanel()
         controllerPanel = buildControllerPanel()
         mapPanel = buildMapPanel()
@@ -99,10 +106,11 @@ class GameActivity : SDLActivity() {
                 addView(notice, FrameLayout.LayoutParams(MATCH, MATCH))
                 addView(hamburger, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP or Gravity.START))
                 addView(
-                    menuPanel,
-                    FrameLayout.LayoutParams(dp(280), WRAP, Gravity.TOP or Gravity.START).apply {
+                    menuScroll,
+                    FrameLayout.LayoutParams(dp(280), MATCH, Gravity.TOP or Gravity.START).apply {
                         topMargin = dp(56)
                         leftMargin = dp(8)
+                        bottomMargin = dp(8)
                     }
                 )
                 addView(editPanel, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.TOP).apply { topMargin = dp(56) })
@@ -115,6 +123,7 @@ class GameActivity : SDLActivity() {
         // The engine reads the gamepad map when it starts, and takes a new one on its next frame.
         padMap = settings.loadPadMap()
         NativeBridge.setPadMap(PadMapping.serialize(padMap))
+        importPendingSaves()
         openDisc()
     }
 
@@ -157,7 +166,6 @@ class GameActivity : SDLActivity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(0xE6101010.toInt())
             setPadding(dp(8), dp(8), dp(8), dp(8))
-            visibility = View.GONE
             addView(menuItem(getString(R.string.menu_pause)) {
                 hideMenu()
                 touchPad.pulse(Pad.START)
@@ -178,6 +186,26 @@ class GameActivity : SDLActivity() {
                 hideMenu()
                 startActivityForResult(RomStore.pickerIntent(), REQ_CHANGE_DISC)
             })
+            addView(menuItem(getString(R.string.menu_export_saves)) {
+                hideMenu()
+                startActivityForResult(
+                    Intent(Intent.ACTION_CREATE_DOCUMENT)
+                        .addCategory(Intent.CATEGORY_OPENABLE)
+                        .setType("application/zip")
+                        .putExtra(Intent.EXTRA_TITLE, "crash-twinsanity-saves.zip"),
+                    REQ_EXPORT_SAVES
+                )
+            })
+            addView(menuItem(getString(R.string.menu_import_saves)) {
+                hideMenu()
+                startActivityForResult(
+                    Intent(Intent.ACTION_OPEN_DOCUMENT)
+                        .addCategory(Intent.CATEGORY_OPENABLE)
+                        .setType("*/*")
+                        .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/zip", "application/octet-stream")),
+                    REQ_IMPORT_SAVES
+                )
+            })
             addView(menuItem(getString(R.string.menu_quit)) { finish() })
         }
     }
@@ -189,7 +217,7 @@ class GameActivity : SDLActivity() {
     }
 
     private fun hideMenu() {
-        menuPanel.visibility = View.GONE
+        menuScroll.visibility = View.GONE
     }
 
     private fun cycleScreen() {
@@ -419,6 +447,14 @@ class GameActivity : SDLActivity() {
             if (resultCode == RESULT_OK) data?.data?.let { mods.onPicked(it) }
             return
         }
+        if (requestCode == REQ_EXPORT_SAVES) {
+            if (resultCode == RESULT_OK) data?.data?.let { exportSaves(it) }
+            return
+        }
+        if (requestCode == REQ_IMPORT_SAVES) {
+            if (resultCode == RESULT_OK) data?.data?.let { confirmImport(it) }
+            return
+        }
         if (requestCode != REQ_CHANGE_DISC || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         if (RomStore.accept(this, uri)) {
@@ -426,6 +462,45 @@ class GameActivity : SDLActivity() {
         } else {
             Toast.makeText(this, R.string.rom_not_disc, Toast.LENGTH_LONG).show()
         }
+    }
+
+    /** Writes the player's saves to the file the user chose. */
+    private fun exportSaves(uri: Uri) {
+        Thread {
+            val message = try {
+                val count = contentResolver.openOutputStream(uri)?.use { SaveBackup.export(this, it) } ?: 0
+                if (count == 0) getString(R.string.saves_none) else getString(R.string.saves_exported, count)
+            } catch (e: Exception) {
+                getString(R.string.saves_failed, e.message ?: "")
+            }
+            runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
+        }.start()
+    }
+
+    /** Asks before a backup replaces the saves. The import itself runs when the game restarts (onCreate). */
+    private fun confirmImport(uri: Uri) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.saves_import_title)
+            .setMessage(R.string.saves_import_warning)
+            .setPositiveButton(R.string.saves_import_ok) { _, _ ->
+                pendingImport = uri
+                recreate() // onDestroy stops the engine; the import runs before the new one reads the saves
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** Restores the backup chosen before the restart, while the engine is stopped and before it reads the cards. */
+    private fun importPendingSaves() {
+        val uri = pendingImport ?: return
+        pendingImport = null
+        val message = try {
+            val count = contentResolver.openInputStream(uri)?.use { SaveBackup.restore(this, it) } ?: 0
+            getString(R.string.saves_imported, count)
+        } catch (e: Exception) {
+            getString(R.string.saves_failed, e.message ?: "")
+        }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
     override fun onDestroy() {
@@ -439,6 +514,10 @@ class GameActivity : SDLActivity() {
 
     companion object {
         private const val REQ_CHANGE_DISC = 2
+        private const val REQ_EXPORT_SAVES = 5
+        private const val REQ_IMPORT_SAVES = 6
+        /** A backup picked in the menu, applied by the activity that the restart creates. */
+        private var pendingImport: Uri? = null
         private const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
         private const val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
     }
