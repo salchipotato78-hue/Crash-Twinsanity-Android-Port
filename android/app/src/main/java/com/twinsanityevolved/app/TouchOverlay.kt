@@ -79,14 +79,16 @@ class TouchOverlay(context: Context) : View(context) {
     private fun bitmap(c: Control): Bitmap = bitmaps.getOrPut(c) { load(c.drawable) }
 
     /** Where a control is on screen now: its centre from the slot, its width from the scale, its height from the art. */
-    private fun boundsOf(s: Slot): RectF {
+    private fun boundsOf(s: Slot): RectF = boundsAt(s, s.x * width, s.y * height)
+
+    private fun boundsAt(s: Slot, cx: Float, cy: Float): RectF {
         val b = bitmap(s.control)
         val w = s.control.widthFraction * width * s.scale
         val h = w * b.height / b.width
-        val cx = s.x * width
-        val cy = s.y * height
         return RectF(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
     }
+
+    private fun stickHeld(): Boolean = pointerOwner.values.any { it.control.isStick }
 
     private fun hit(x: Float, y: Float): Slot? = if (menuMode && !editing) null else slots.lastOrNull { s ->
         val r = boundsOf(s)
@@ -111,7 +113,7 @@ class TouchOverlay(context: Context) : View(context) {
      */
     fun releaseAll() {
         pointerOwner.clear()
-        stickVector.set(0f, 0f)
+        resetStick()
         tapPointer = -1
         swiping = false
         dragging = false
@@ -126,13 +128,13 @@ class TouchOverlay(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         if (menuMode && !editing) return
         for (s in slots) {
-            val r = boundsOf(s)
+            val r = if (s.control.isStick && stickHeld()) boundsAt(s, stickDown.x, stickDown.y) else boundsOf(s)
             paint.alpha = (s.alpha * gameOpacity * 255).toInt()
             canvas.drawBitmap(bitmap(s.control), null, r, paint)
             if (s.control.isStick) {
                 val k = r.width() * 0.42f
-                val kx = r.centerX() + stickVector.x * r.width() * 0.25f
-                val ky = r.centerY() + stickVector.y * r.width() * 0.25f
+                val kx = r.centerX() + knobOffset.x
+                val ky = r.centerY() + knobOffset.y
                 canvas.drawBitmap(knob, null, RectF(kx - k / 2, ky - k / 2, kx + k / 2, ky + k / 2), paint)
             }
             if (editing && s === selected) canvas.drawRect(r, outline)
@@ -147,7 +149,7 @@ class TouchOverlay(context: Context) : View(context) {
         for (i in 0 until e.pointerCount) present.add(e.getPointerId(i))
         if (pointerOwner.keys.any { it !in present }) {
             pointerOwner.keys.retainAll(present)
-            if (pointerOwner.values.none { it.control.isStick }) stickVector.set(0f, 0f)
+            if (pointerOwner.values.none { it.control.isStick }) resetStick()
         }
         if (tapPointer != -1 && tapPointer !in present) tapPointer = -1
         when (e.actionMasked) {
@@ -179,7 +181,7 @@ class TouchOverlay(context: Context) : View(context) {
             }
             MotionEvent.ACTION_CANCEL -> {
                 pointerOwner.clear()
-                stickVector.set(0f, 0f)
+                resetStick()
                 tapPointer = -1
                 swiping = false
             }
@@ -254,23 +256,32 @@ class TouchOverlay(context: Context) : View(context) {
 
     private fun release(pointerId: Int) {
         val s = pointerOwner.remove(pointerId) ?: return
-        if (s.control.isStick) stickVector.set(0f, 0f)
+        if (s.control.isStick) resetStick()
     }
 
-    // The stick measures from where the finger landed, not from the control's centre: a thumb resting on the stick
-    // (off centre) does not walk Crash. A dead zone ignores the small wobble of a finger that has not moved.
+    // A floating stick: the base sits where the finger landed, so a thumb resting on the stick reads zero. The knob
+    // follows the finger, clamped to the rim; the push is the knob's offset from the base (full speed at the rim).
     private val stickDown = PointF()
+    private val knobOffset = PointF()
+    private fun resetStick() {
+        stickVector.set(0f, 0f)
+        knobOffset.set(0f, 0f)
+    }
     private fun moveStick(s: Slot, px: Float, py: Float) {
         val radius = boundsOf(s).width() / 2
-        val dx = (px - stickDown.x) / radius
-        val dy = (py - stickDown.y) / radius
+        val dx = px - stickDown.x
+        val dy = py - stickDown.y
         val len = hypot(dx, dy)
-        if (len < 0.15f) {
+        val reach = if (len > radius) radius / len else 1f
+        knobOffset.set(dx * reach, dy * reach)
+        val frac = len / radius
+        val dead = 0.08f
+        if (frac <= dead || len == 0f) {
             stickVector.set(0f, 0f)
             return
         }
-        val k = if (len > 1f) 1f / len else 1f
-        stickVector.set(dx * k, dy * k)
+        val mag = ((frac - dead) / (1f - dead)).coerceAtMost(1f)
+        stickVector.set(dx / len * mag, dy / len * mag)
     }
 
     private fun publish() {

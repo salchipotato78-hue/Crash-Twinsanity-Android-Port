@@ -8,6 +8,7 @@
 extern "C" void te_android_pad_read(uint32_t* bits, float* lx, float* ly);
 // The finger's drag since the last take, in dp (android/native): the camera's mouse look.
 extern "C" void te_android_look_take(float* dx, float* dy);
+extern "C" bool te_android_menu_open();
 #endif
 
 namespace ps2r::platform::sdl {
@@ -50,10 +51,14 @@ void AndroidPadBackend::Poll(NormalizedInput& out) {
     if (bits & kJavaDown)     b |= kBtnDown;
     if (bits & kJavaLeft)     b |= kBtnLeft;
     if (bits & kJavaRight)    b |= kBtnRight;
-    if (lx >  kDpadThreshold) b |= kBtnRight;
-    if (lx < -kDpadThreshold) b |= kBtnLeft;
-    if (ly >  kDpadThreshold) b |= kBtnUp;
-    if (ly < -kDpadThreshold) b |= kBtnDown;
+    // The stick also reads as the d-pad, but only in a menu: in the game a push past half-way on one axis would
+    // press a d-pad direction too, which stops Crash on that side.
+    if (te_android_menu_open()) {
+        if (lx >  kDpadThreshold) b |= kBtnRight;
+        if (lx < -kDpadThreshold) b |= kBtnLeft;
+        if (ly >  kDpadThreshold) b |= kBtnUp;
+        if (ly < -kDpadThreshold) b |= kBtnDown;
+    }
     out.buttons |= b;
 
     // The drag turns the camera: a mouse delta, the mapper's look (mouse = right stick) with its own decay.

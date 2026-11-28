@@ -167,6 +167,11 @@ void te_android_set_menu(bool open) {
     g_menu.store(open);
 }
 
+// Read by the engine's pad backend (platform/sdl/input/android_pad_backend.cpp).
+bool te_android_menu_open() {
+    return g_menu.load();
+}
+
 JNIEXPORT jboolean JNICALL
 Java_com_twinsanityevolved_app_NativeBridge_nativeMenuOpen(JNIEnv*, jclass) {
     return g_menu.load() ? JNI_TRUE : JNI_FALSE;
