@@ -86,6 +86,13 @@ object ModSettings {
         f.writeText(lines.joinToString("\n", postfix = "\n"))
     }
 
+    /** Sets one key of ps2r.ini (the game's settings file); the other lines are kept as they are. */
+    fun putSetting(context: Context, key: String, value: String) {
+        val lines = readLines(context).toMutableList()
+        setKey(lines, key, value)
+        writeLines(context, lines)
+    }
+
     private fun keyOf(line: String): String? {
         val t = line.substringBefore(';').trim()
         val eq = t.indexOf('=')

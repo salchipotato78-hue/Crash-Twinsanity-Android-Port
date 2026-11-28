@@ -32,7 +32,7 @@ namespace {
 std::mutex g_lock;
 int g_fd = -1;
 bool g_discOk = false;
-std::string g_status = "motor no iniciado";
+std::string g_status = "engine not started";
 std::atomic<bool> g_stop{false};
 std::atomic<int> g_pad{0};
 std::atomic<float> g_stickX{0.0f};
@@ -73,15 +73,15 @@ std::string FfmpegCheck() {
     std::snprintf(version, sizeof(version), "FFmpeg %u.%u.%u", AV_VERSION_MAJOR(v), AV_VERSION_MINOR(v),
                   AV_VERSION_MICRO(v));
     const AVCodec* codec = avcodec_find_decoder(AV_CODEC_ID_MPEG2VIDEO);
-    if (!codec) return std::string(version) + ": sin decodificador MPEG-2";
+    if (!codec) return std::string(version) + ": no MPEG-2 decoder";
     AVCodecContext* ctx = avcodec_alloc_context3(codec);
-    if (!ctx) return std::string(version) + ": sin memoria para el decodificador";
+    if (!ctx) return std::string(version) + ": out of memory for the decoder";
     const int ret = avcodec_open2(ctx, codec, nullptr);
     avcodec_free_context(&ctx);
-    if (ret < 0) return std::string(version) + ": el decodificador MPEG-2 no abre";
-    return std::string(version) + ": decodificador MPEG-2 listo";
+    if (ret < 0) return std::string(version) + ": the MPEG-2 decoder does not open";
+    return std::string(version) + ": MPEG-2 decoder ready";
 #else
-    return "FFmpeg no enlazado";
+    return "FFmpeg not linked";
 #endif
 }
 
@@ -91,18 +91,18 @@ void CheckDisc() {
     std::string error;
     if (!IsoFindRootFile(ReadDisc, "SLES_525.68", &entry, &error)) {
         g_discOk = false;
-        g_status = "No se encontró el ejecutable del juego: " + error;
+        g_status = "Game executable not found: " + error;
         return;
     }
     uint8_t magic[4] = {0, 0, 0, 0};
     if (!ReadDisc(static_cast<uint64_t>(entry.lba) * 2048, magic, 4) || magic[0] != 0x7f || magic[1] != 'E') {
         g_discOk = false;
-        g_status = "El ejecutable del juego no es un programa válido.";
+        g_status = "The game executable is not a valid program.";
         return;
     }
     g_discOk = true;
     char text[160];
-    std::snprintf(text, sizeof(text), "Disco leído: SLES_525.68, %u bytes. Iniciando el motor.", entry.size);
+    std::snprintf(text, sizeof(text), "Disc read: SLES_525.68, %u bytes. Starting the engine.", entry.size);
     g_status = text;
     LOGI("%s", text);
 }
@@ -159,7 +159,7 @@ Java_com_twinsanityevolved_app_NativeBridge_nativeStop(JNIEnv*, jclass) {
     if (g_fd >= 0) close(g_fd);
     g_fd = -1;
     g_discOk = false;
-    g_status = "motor detenido";
+    g_status = "engine stopped";
 }
 
 // The game's menu state, from the runner's boundary hook (runner/main.cpp).

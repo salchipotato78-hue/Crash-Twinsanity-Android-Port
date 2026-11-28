@@ -174,8 +174,8 @@ class GameActivity : SDLActivity() {
 
     private fun cycleScreen() {
         settings.screen = settings.screen.next()
-        // The picture's aspect is the engine's (its Widescreen and display options); the choice is kept for it.
         screenButton.text = getString(R.string.menu_screen, settings.screen.label)
+        Toast.makeText(this, R.string.screen_applies_next, Toast.LENGTH_SHORT).show()
     }
 
     // ----- editing the touch controls ----------------------------------------------------------------------------
@@ -263,10 +263,11 @@ class GameActivity : SDLActivity() {
         }
         // Before SDL's first frame: SDL starts the engine's main() as soon as the surface is ready, and main() reads the disc.
         engineStarted = NativeBridge.start(path, filesDir.absolutePath)
-        notice.text = NativeBridge.status()
-        notice.visibility = View.VISIBLE
-        // The game draws underneath: the status is for the start-up only.
-        notice.postDelayed({ notice.visibility = View.GONE }, 4000)
+        // Nothing is shown when the game starts. Only a disc that cannot be opened gets a message.
+        if (!engineStarted) {
+            showNotice(R.string.disc_open_failed)
+            notice.postDelayed({ notice.visibility = View.GONE }, 4000)
+        }
     }
 
     private fun showNotice(res: Int) {

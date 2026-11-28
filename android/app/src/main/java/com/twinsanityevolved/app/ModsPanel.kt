@@ -31,27 +31,27 @@ class ModsPanel(private val activity: GameActivity) {
             setPadding(dp(16), dp(12), dp(16), dp(8))
         }
         root.addView(TextView(ctx).apply {
-            text = "Los cambios se aplican la próxima vez que inicies el juego."
+            text = "Changes apply the next time you start the game."
             setTextColor(Color.LTGRAY)
             textSize = 13f
         })
         val mods = ModSettings.list(ctx)
         if (mods.isEmpty()) {
             root.addView(TextView(ctx).apply {
-                text = "No hay mods importados."
+                text = "No mods imported yet."
                 setTextColor(Color.WHITE)
                 setPadding(0, dp(12), 0, dp(12))
             })
         }
         for (m in mods) root.addView(row(m))
         root.addView(Button(ctx).apply {
-            text = "Importar mod…"
+            text = "Import mod…"
             setOnClickListener { pick() }
         })
         dialog = AlertDialog.Builder(ctx)
             .setTitle("Mods")
             .setView(ScrollView(ctx).apply { addView(root) })
-            .setNegativeButton("Cerrar", null)
+            .setNegativeButton("Close", null)
             .show()
     }
 
@@ -88,7 +88,7 @@ class ModsPanel(private val activity: GameActivity) {
             setOnCheckedChangeListener { _, on -> ModSettings.setEnabled(ctx, m.id, on) }
         })
         box.addView(Button(ctx).apply {
-            this.text = "Quitar"
+            this.text = "Remove"
             setOnClickListener { confirmRemove(m) }
         })
         return box
@@ -107,18 +107,18 @@ class ModsPanel(private val activity: GameActivity) {
     /** The file the player picked: copied, identified, checked, then imported off the UI thread. */
     fun onPicked(uri: Uri) {
         val ctx = activity
-        Toast.makeText(ctx, "Importando…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(ctx, "Importing…", Toast.LENGTH_SHORT).show()
         Thread {
             val picked = ModImporter.copyPicked(ctx, uri)
             if (picked == null) {
-                ui { info("No se pudo leer el archivo.", "Elígelo otra vez.") { show() } }
+                ui { info("Could not read the file.", "Pick it again.") { show() } }
                 return@Thread
             }
             val ident = ModImporter.identify(picked.file)
             if (ident == null) {
                 val (kind, why) = ModImporter.detect(picked.file)
                 picked.file.delete()
-                ui { info("Ese archivo no es un mod.", "$kind\n$why") { show() } }
+                ui { info("That file is not a mod.", "$kind\n$why") { show() } }
                 return@Thread
             }
             val (id, name) = ident
@@ -126,8 +126,8 @@ class ModsPanel(private val activity: GameActivity) {
                 picked.file.delete()
                 ui {
                     info(
-                        "Nombre reservado",
-                        "«$name» tiene el nombre de un mod que ya trae el juego ($id). Cámbiale el nombre al mod y vuelve a importarlo."
+                        "Reserved name",
+                        "\"$name\" has the same name as a mod that comes with the game ($id). Rename the mod and import it again."
                     ) { show() }
                 }
                 return@Thread
@@ -136,10 +136,10 @@ class ModsPanel(private val activity: GameActivity) {
             if (exists) {
                 ui {
                     AlertDialog.Builder(ctx)
-                        .setTitle("¿Reemplazar «$name»?")
-                        .setMessage("Ya tienes un mod con ese nombre. La copia que tienes se quita cuando la nueva esté completa. Su interruptor y su lugar se conservan.")
-                        .setPositiveButton("Reemplazar") { _, _ -> importNow(picked.file) }
-                        .setNegativeButton("Cancelar") { _, _ -> picked.file.delete(); show() }
+                        .setTitle("Replace \"$name\"?")
+                        .setMessage("You already have a mod with that name. Your current copy is removed once the new one is complete. Its switch and its place are kept.")
+                        .setPositiveButton("Replace") { _, _ -> importNow(picked.file) }
+                        .setNegativeButton("Cancel") { _, _ -> picked.file.delete(); show() }
                         .setCancelable(false)
                         .show()
                 }
@@ -162,18 +162,18 @@ class ModsPanel(private val activity: GameActivity) {
                             ModSettings.setEnabled(ctx, result.id, true)
                         }
                         val lines = mutableListOf(
-                            "«${result.name}» ${if (result.replaced) "reemplazado" else "añadido y activado"}.",
-                            "${result.filesChanged} archivo(s) cambiados.",
-                            "Se aplica la próxima vez que inicies el juego.",
+                            "\"${result.name}\" ${if (result.replaced) "replaced" else "added and enabled"}.",
+                            "${result.filesChanged} file(s) changed.",
+                            "Applies the next time you start the game.",
                         )
                         if (result.warnings.isNotEmpty()) {
                             lines.add("")
-                            lines.add("Avisos:")
+                            lines.add("Warnings:")
                             result.warnings.forEach { lines.add("• $it") }
                         }
-                        info("Mod importado", lines.joinToString("\n")) { show() }
+                        info("Mod imported", lines.joinToString("\n")) { show() }
                     }
-                    is ModImporter.Result.Failed -> info("No se pudo importar", result.message) { show() }
+                    is ModImporter.Result.Failed -> info("Could not import", result.message) { show() }
                 }
             }
         }.start()
@@ -184,16 +184,16 @@ class ModsPanel(private val activity: GameActivity) {
     private fun confirmRemove(m: Mod) {
         val ctx = activity
         AlertDialog.Builder(ctx)
-            .setTitle("¿Quitar «${m.name}»?")
-            .setMessage("Se borra del teléfono. Si quieres volver a usarlo, tendrás que importarlo otra vez.")
-            .setPositiveButton("Quitar") { _, _ ->
+            .setTitle("Remove \"${m.name}\"?")
+            .setMessage("It is deleted from the phone. To use it again, you will have to import it again.")
+            .setPositiveButton("Remove") { _, _ ->
                 Thread {
                     m.folder.deleteRecursively()
                     ModSettings.forget(ctx, m.id)
                     ui { show() }
                 }.start()
             }
-            .setNegativeButton("Cancelar") { _, _ -> show() }
+            .setNegativeButton("Cancel") { _, _ -> show() }
             .show()
     }
 
@@ -203,7 +203,7 @@ class ModsPanel(private val activity: GameActivity) {
         AlertDialog.Builder(activity)
             .setTitle(title)
             .setMessage(message)
-            .setPositiveButton("Aceptar") { _, _ -> then() }
+            .setPositiveButton("OK") { _, _ -> then() }
             .show()
     }
 

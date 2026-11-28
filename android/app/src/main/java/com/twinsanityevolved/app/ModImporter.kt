@@ -66,12 +66,12 @@ object ModImporter {
      * patch applied to a temporary copy of the disc), so call it off the UI thread.
      */
     fun importFile(context: Context, file: File): Result {
-        val disc = baseDisc(context) ?: return Result.Failed("Primero elige el disco del juego.")
+        val disc = baseDisc(context) ?: return Result.Failed("First pick the game disc.")
         val mods = modsDir(context).apply { mkdirs() }
         val out = nativeImport(file.absolutePath, disc.absolutePath, mods.absolutePath)
         val lines = out.split("\n", limit = 6)
         if (lines.isEmpty() || lines[0] != "OK") {
-            return Result.Failed(out.removePrefix("ERROR\n").ifEmpty { "No se pudo importar el archivo." })
+            return Result.Failed(out.removePrefix("ERROR\n").ifEmpty { "Could not import the file." })
         }
         val warnings = lines.getOrElse(5) { "" }.split('\u001f').filter { it.isNotBlank() }
         return Result.Added(

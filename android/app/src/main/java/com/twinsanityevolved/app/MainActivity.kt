@@ -37,7 +37,7 @@ class MainActivity : Activity() {
 
     private fun openGame() {
         val uri = RomStore.get(this) ?: return
-        Toast.makeText(this, "Preparando el disco…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Preparing the disc…", Toast.LENGTH_SHORT).show()
         Thread {
             val path = try {
                 DiscImport.importDisc(this, uri)
