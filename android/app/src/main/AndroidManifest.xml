@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- A paired controller over Bluetooth (DualShock 4, DualSense): SDL's HIDAPI reads it through Bluetooth. Android 12
+         and later ask for BLUETOOTH_CONNECT at run time (SDL asks, see runner/te_android.cpp); older systems use BLUETOOTH. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
