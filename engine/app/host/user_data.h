@@ -70,6 +70,9 @@ public:
 
     // The settings file every in-game option persists to.
     static std::string SettingsFile(const Config& cfg);
+    // The runner pins the settings file it loaded at start-up, so the in-game options are written to the file the next
+    // start reads (otherwise they were written to paths.user_data and read from another file). "" = no pin.
+    static void PinSettingsFile(const std::string& path);
 
     // One line per migration for the log / stderr.
     static std::string Describe(const Migration& m);

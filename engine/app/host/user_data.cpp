@@ -39,7 +39,16 @@ bool UserData::CarryOverLegacyRoot(const std::string& root, std::string* note) {
     return true;
 }
 
+namespace {
+std::string g_pinned_settings;   // UserData::PinSettingsFile: the file the runner loaded
+}  // namespace
+
+void UserData::PinSettingsFile(const std::string& path) {
+    g_pinned_settings = path;
+}
+
 std::string UserData::SettingsFile(const Config& cfg) {
+    if (!g_pinned_settings.empty()) return g_pinned_settings;
     return cfg.paths.user_data.empty() ? std::string("ps2r.ini") : cfg.paths.user_data + "/ps2r.ini";
 }
 

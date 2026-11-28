@@ -36,6 +36,7 @@
 #include "engine/ee/mem/main_memory.h"
 #include "engine/core/config/config_loader.h"
 #include "engine/core/config/settings_file.h"
+#include "engine/app/host/user_data.h"
 #include "engine/platform/ps2e/present_pacer.h"
 #include "te_graphics_hooks.h"
 #include "engine/platform/host/platform.h"
@@ -480,7 +481,10 @@ int main(int argc, char** argv) {
                 else std::snprintf(hz_source, sizeof hz_source, "%s: %s", kSettingsDefaultName,
                                    !existed ? "no ps2r.ini yet" : err.empty() ? "ps2r.ini has no game.hz" : "ps2r.ini not readable");
             }
-            if (!settings.deterministic || explicit_config) settings.settings_path = config_path;
+            if (!settings.deterministic || explicit_config) {
+                settings.settings_path = config_path;
+                ps2r::app::UserData::PinSettingsFile(config_path);   // the in-game options persist to the file loaded here
+            }
             // the retired one-key form of two languages, game.language = <text>+<speech> ('s "arabic+french"): read once as
             // the two names and the file rewritten with the two keys
             if (legacy_language_form && !settings.settings_path.empty()) {
