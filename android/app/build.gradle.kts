@@ -11,10 +11,10 @@ android {
         applicationId = "com.twinsanityevolved.app"
         minSdk = 26
         targetSdk = 34
-        // Bumped with the icon change: the launcher keeps the icon it cached for a version, so an update under the same
-        // version can keep showing the old one.
-        versionCode = 4
-        versionName = "0.1.3"
+        // Android installs an APK over the installed one only when its versionCode is higher. CI sets VERSION_CODE from
+        // its run number, so every CI build updates the last; a local build keeps the default unless it sets it.
+        versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 4
+        versionName = System.getenv("VERSION_NAME") ?: "0.1.3"
     }
 
     // A fixed key, so each build installs over the last one (Android refuses an update signed by another key).
