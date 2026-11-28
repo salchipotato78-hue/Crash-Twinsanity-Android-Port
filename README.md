@@ -1,4 +1,7 @@
-# TwinsanityEvolved
+<p align="center">
+  <img src="screenshots/Twinsanity-Android-logo.png" width="70%" alt="The launcher">
+
+# TwinsanityEvolved Android Port
 
 Native PC port of Crash Twinsanity: the [twinsanity-reversed](https://github.com/Smartkin/twinsanity-reversed)
 decompilation (`game/`) running on the NativeEE engine (`engine/`).
