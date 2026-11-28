@@ -151,6 +151,17 @@ Java_com_twinsanityevolved_app_NativeBridge_nativeSetPad(JNIEnv*, jclass, jint b
     g_stickY.store(ly);
 }
 
+// The app's gamepad button map, "cross=a" lines (platform/sdl/input/android_pad_backend.cpp): the engine takes it on its
+// next frame.
+extern "C" void te_android_set_pad_map(const char* text);
+
+JNIEXPORT void JNICALL
+Java_com_twinsanityevolved_app_NativeBridge_nativeSetPadMap(JNIEnv* env, jclass, jstring spec) {
+    const char* text = env->GetStringUTFChars(spec, nullptr);
+    te_android_set_pad_map(text);
+    env->ReleaseStringUTFChars(spec, text);
+}
+
 JNIEXPORT void JNICALL
 Java_com_twinsanityevolved_app_NativeBridge_nativeStop(JNIEnv*, jclass) {
     std::lock_guard<std::mutex> lock(g_lock);
