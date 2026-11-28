@@ -82,13 +82,19 @@ jobs:
             -DTE_ANDROID_JNILIBS="$GITHUB_WORKSPACE/android/app/src/main/jniLibs/arm64-v8a"
           cmake --build build-android --target twinsanityevolved_android
 
-      - name: Restore the signing key (repository secrets; skipped when none is set)
+      - name: Restore the signing key (repository secrets)
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          BUILD_KIND: ${{ inputs.build }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/crash.jks"
             echo "KEYSTORE_PATH=$RUNNER_TEMP/crash.jks" >> "$GITHUB_ENV"
+          elif [ "$BUILD_KIND" = "release" ]; then
+            # Without the repository's key the APK would be signed by this runner's debug key, and an installed copy
+            # signed by another key can only be replaced by uninstalling it (its data included). Refuse instead.
+            echo "::error::The release build needs the KEYSTORE_BASE64 secret (the fixed signing key)."
+            exit 1
           fi
 
       - name: Build the APK
@@ -97,6 +103,9 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          # Each run's versionCode is larger than the last, so an installed copy is always updated in place.
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: "0.1.3-ci.${{ github.run_number }}"
         run: gradle --no-daemon ":app:assemble${{ inputs.build == 'release' && 'Release' || 'Debug' }}"
 
       - name: Upload the APK
