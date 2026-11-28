@@ -63,6 +63,8 @@ IOPRP???.IMG
 *.png
 # the one picture exemption (tools/ci/asset_scan.sh): the launcher's own window for README, nothing of the disc
 !/docs/launcher/screenshots/launcher-*.png
+# The Android port's art (icons, touch pad): the pictures of its res/ folder are part of the source
+!/android/app/src/main/res/**/*.png
 *.jpg
 *.jpeg
 *.wav
