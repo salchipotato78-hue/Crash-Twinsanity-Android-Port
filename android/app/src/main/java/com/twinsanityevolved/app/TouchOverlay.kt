@@ -88,8 +88,6 @@ class TouchOverlay(context: Context) : View(context) {
         return RectF(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
     }
 
-    private fun stickHeld(): Boolean = pointerOwner.values.any { it.control.isStick }
-
     private fun hit(x: Float, y: Float): Slot? = if (menuMode && !editing) null else slots.lastOrNull { s ->
         val r = boundsOf(s)
         hypot(x - r.centerX(), y - r.centerY()) <= r.width() / 2 * 1.15f
@@ -128,7 +126,7 @@ class TouchOverlay(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         if (menuMode && !editing) return
         for (s in slots) {
-            val r = if (s.control.isStick && stickHeld()) boundsAt(s, stickDown.x, stickDown.y) else boundsOf(s)
+            val r = boundsOf(s)
             paint.alpha = (s.alpha * gameOpacity * 255).toInt()
             canvas.drawBitmap(bitmap(s.control), null, r, paint)
             if (s.control.isStick) {
@@ -158,10 +156,7 @@ class TouchOverlay(context: Context) : View(context) {
                 val s = hit(e.getX(i), e.getY(i))
                 if (s != null) {
                     pointerOwner[e.getPointerId(i)] = s
-                    if (s.control.isStick) {
-                        stickDown.set(e.getX(i), e.getY(i))   // the stick measures from where the finger landed
-                        moveStick(s, e.getX(i), e.getY(i))
-                    }
+                    if (s.control.isStick) moveStick(s, e.getX(i), e.getY(i))
                 } else {
                     startTap(e.getPointerId(i), e.getX(i), e.getY(i))
                 }
@@ -259,18 +254,19 @@ class TouchOverlay(context: Context) : View(context) {
         if (s.control.isStick) resetStick()
     }
 
-    // A floating stick: the base sits where the finger landed, so a thumb resting on the stick reads zero. The knob
-    // follows the finger, clamped to the rim; the push is the knob's offset from the base (full speed at the rim).
-    private val stickDown = PointF()
+    // A fixed stick: the base stays where the layout puts it (only editing moves it), and the push is measured from its
+    // centre. The knob follows the finger, clamped to the rim (full speed there). Because the base never leaves its
+    // place, its rim stays on screen and the thumb reaches full speed in every direction.
     private val knobOffset = PointF()
     private fun resetStick() {
         stickVector.set(0f, 0f)
         knobOffset.set(0f, 0f)
     }
     private fun moveStick(s: Slot, px: Float, py: Float) {
-        val radius = boundsOf(s).width() / 2
-        val dx = px - stickDown.x
-        val dy = py - stickDown.y
+        val base = boundsOf(s)
+        val radius = base.width() / 2
+        val dx = px - base.centerX()
+        val dy = py - base.centerY()
         val len = hypot(dx, dy)
         val reach = if (len > radius) radius / len else 1f
         knobOffset.set(dx * reach, dy * reach)
