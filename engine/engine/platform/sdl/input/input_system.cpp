@@ -51,6 +51,7 @@ void InputSystem::Init(const InputSettings& settings) {
     const float sensitivity = from_file ? b.gamepad_sensitivity : settings.gamepad_sensitivity;
     const bool  pad_enabled = settings.gamepad_enabled && (!from_file || b.gamepad_enabled);
 
+    android_map_seen_ = 0;   // a map the Android app set before this engine start is applied again
     kbm_     = std::make_unique<KeyboardMouseBackend>(&mapper_);
     gamepad_ = std::make_unique<GamepadBackend>(deadzone, sensitivity, pad_enabled, settings.gamecontrollerdb_path);
     android_pad_ = std::make_unique<AndroidPadBackend>();
@@ -139,6 +140,12 @@ void InputSystem::SetKbmEnabled(bool enabled) {
 
 PadSample InputSystem::Frame(float dt_seconds) {
     if (!initialized_) return PadSample{};   // neutral: no buttons, sticks 0x80
+
+    // The Android app's gamepad button map (the Controller menu), applied when it changes.
+    if (gamepad_) {
+        PadButtonMap map;
+        if (AndroidPadMapSince(android_map_seen_, map)) gamepad_->SetButtonMap(map);
+    }
 
     NormalizedInput merged;
     InputBackend* order[3] = {kbm_.get(), gamepad_.get(), android_pad_.get()};

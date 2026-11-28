@@ -136,6 +136,11 @@ void GamepadBackend::TryOpenDeviceIndex(int device_index) {
     pad.instance_id = js ? (int)SDL_JoystickInstanceID(js) : -1;
     pads_.push_back(pad);
 
+    // The DualShock 4 / DualSense lightbar is green while the game has the pad. A pad without an LED (or a host that
+    // cannot write one) makes SDL return -1: the light is then left as the system set it.
+    const SDL_GameControllerType type = SDL_GameControllerGetType(gc);
+    if (type == SDL_CONTROLLER_TYPE_PS4 || type == SDL_CONTROLLER_TYPE_PS5) SDL_GameControllerSetLED(gc, 0, 255, 0);
+
     const char* name = SDL_GameControllerName(gc);
     std::fprintf(stderr, "input: gamepad connected: %s (instance %d)%s\n", name ? name : "?", pad.instance_id,
                  generic ? " [generic mapping]" : "");

@@ -99,6 +99,7 @@ private:
     std::unique_ptr<GamepadBackend>       gamepad_;
     std::unique_ptr<AndroidPadBackend>    android_pad_;   // the Android touch overlay (idle elsewhere)
     PadSample last_;
+    uint64_t android_map_seen_ = 0;   // the last Android gamepad map applied (AndroidPadMapSince)
     bool ui_capture_ = false;
     bool kbm_enabled_ = true;
     bool initialized_ = false;

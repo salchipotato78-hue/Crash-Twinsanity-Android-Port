@@ -2,6 +2,9 @@
 #include "engine/platform/sdl/input/android_pad_backend.h"
 
 #include <cstdint>
+#include <cstdlib>
+#include <mutex>
+#include <string>
 
 #if defined(__ANDROID__)
 // Defined in android/native/src/twinsanityevolved_jni.cpp (the same library): the last pad state the touch overlay sent.
@@ -23,7 +26,81 @@ constexpr uint32_t kJavaUp = 128, kJavaDown = 256, kJavaLeft = 512, kJavaRight =
 constexpr float kDpadThreshold = 0.5f;
 // The mapper reads mouse deltas as pixels (0.35 stick units per 100 px): one dp of drag is a mouse pixel.
 constexpr float kLookPixelsPerDp = 1.0f;
+
 }  // namespace
+
+#if defined(__ANDROID__)
+namespace {
+// The LogicalButton bit of each [pad] name the Android app writes (the bindings.ini [pad] section's keys).
+struct PadName {
+    const char* name;
+    uint32_t bit;
+};
+constexpr PadName kPadNames[] = {
+    {"cross", kBtnCross},       {"circle", kBtnCircle},   {"square", kBtnSquare}, {"triangle", kBtnTriangle},
+    {"l1", kBtnL1},             {"r1", kBtnR1},           {"l2", kBtnL2},         {"r2", kBtnR2},
+    {"l3", kBtnL3},             {"r3", kBtnR3},           {"start", kBtnStart},   {"select", kBtnSelect},
+    {"up", kBtnUp},             {"down", kBtnDown},       {"left", kBtnLeft},     {"right", kBtnRight},
+};
+
+std::string Trim(const std::string& s) {
+    const size_t b = s.find_first_not_of(" \t\r");
+    const size_t e = s.find_last_not_of(" \t\r");
+    return b == std::string::npos ? std::string() : s.substr(b, e - b + 1);
+}
+
+// "cross=a" lines, one per control, over SDL's standard layout. A line it cannot read keeps the control's default.
+PadButtonMap ParsePadMapText(const std::string& text) {
+    PadButtonMap map;
+    size_t pos = 0;
+    while (pos <= text.size()) {
+        size_t end = text.find('\n', pos);
+        if (end == std::string::npos) end = text.size();
+        const std::string line = text.substr(pos, end - pos);
+        pos = end + 1;
+        const size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        const std::string key = Trim(line.substr(0, eq));
+        const std::string value = Trim(line.substr(eq + 1));
+        for (const PadName& n : kPadNames) {
+            if (key != n.name) continue;
+            PadControl control;
+            if (!PadButtonMap::ControlFromName(value, control)) break;
+            int index = 0;
+            while (index < 31 && (1u << index) != n.bit) index++;
+            map.Set(index, control);
+            break;
+        }
+    }
+    return map;
+}
+
+std::mutex g_map_lock;
+std::string g_map_text;          // the last text the app set
+uint64_t g_map_generation = 0;   // counts the sets: 0 = never set
+}  // namespace
+
+// NativeBridge.setPadMap (android/native/src/twinsanityevolved_jni.cpp): the app's gamepad button map as text.
+extern "C" void te_android_set_pad_map(const char* text) {
+    std::lock_guard<std::mutex> lock(g_map_lock);
+    g_map_text = text ? text : "";
+    ++g_map_generation;
+}
+#endif
+
+bool AndroidPadMapSince(uint64_t& seen, PadButtonMap& out) {
+#if defined(__ANDROID__)
+    std::lock_guard<std::mutex> lock(g_map_lock);
+    if (g_map_generation == 0 || g_map_generation == seen) return false;
+    seen = g_map_generation;
+    out = ParsePadMapText(g_map_text);
+    return true;
+#else
+    (void)seen;
+    (void)out;
+    return false;
+#endif
+}
 
 bool AndroidPadBackend::IsActive() const {
 #if defined(__ANDROID__)
