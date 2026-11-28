@@ -36,7 +36,9 @@
 #include "engine/ee/mem/main_memory.h"
 #include "engine/core/config/config_loader.h"
 #include "engine/core/config/settings_file.h"
-#include "app/host/user_data.h"
+#if !defined(__ANDROID__)
+#include "app/host/user_data.h"   // the desktop build only: the Android library does not compile the play composition
+#endif
 #include "engine/platform/ps2e/present_pacer.h"
 #include "te_graphics_hooks.h"
 #include "engine/platform/host/platform.h"
@@ -483,7 +485,9 @@ int main(int argc, char** argv) {
             }
             if (!settings.deterministic || explicit_config) {
                 settings.settings_path = config_path;
+#if !defined(__ANDROID__)
                 ps2r::app::UserData::PinSettingsFile(config_path);   // the in-game options persist to the file loaded here
+#endif
             }
             // the retired one-key form of two languages, game.language = <text>+<speech> ('s "arabic+french"): read once as
             // the two names and the file rewritten with the two keys
