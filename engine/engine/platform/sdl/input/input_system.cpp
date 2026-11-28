@@ -155,9 +155,9 @@ PadSample InputSystem::Frame(float dt_seconds) {
         be->Poll(one);
         if (be == kbm_.get() && !kbm_enabled_) continue;   // polled, discarded
 #if defined(__ANDROID__)
-        // On the phone the only stick is the touch one: a keyboard's keys or a controller's axes never move Crash
-        // (their buttons still count).
-        if (be != android_pad_.get()) { one.lx = one.ly = one.rx = one.ry = 0.f; }
+        // On the phone the sticks are the touch one and a controller's: a keyboard's keys never move Crash (its buttons
+        // still count). Controllers' sticks are merged with the touch stick below, the larger deflection winning.
+        if (be == kbm_.get()) { one.lx = one.ly = one.rx = one.ry = 0.f; }
 #endif
         merged.buttons |= one.buttons;
         merged.lx = Pick(merged.lx, one.lx);
