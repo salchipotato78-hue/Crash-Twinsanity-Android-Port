@@ -277,7 +277,10 @@ class TouchOverlay(context: Context) : View(context) {
             return
         }
         val mag = ((frac - dead) / (1f - dead)).coerceAtMost(1f)
-        stickVector.set(dx / len * mag, dy / len * mag)
+        // A square gate: each axis reaches full deflection at the rim in every direction. A diagonal at the rim reads
+        // (1, 1), not (0.7, 0.7), so the game runs on diagonals as it does on the four directions.
+        val m = kotlin.math.max(kotlin.math.abs(dx), kotlin.math.abs(dy))
+        stickVector.set(dx / m * mag, dy / m * mag)
     }
 
     private fun publish() {

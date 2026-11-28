@@ -13,8 +13,8 @@ android {
         targetSdk = 34
         // Bumped with the icon change: the launcher keeps the icon it cached for a version, so an update under the same
         // version can keep showing the old one.
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.2"
     }
 
     // A fixed key, so each build installs over the last one (Android refuses an update signed by another key).
