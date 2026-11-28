@@ -21,6 +21,7 @@ object NativeBridge {
     @JvmStatic private external fun nativeMenuOpen(): Boolean
     @JvmStatic private external fun nativeSetScreen(width: Int, height: Int)
     @JvmStatic private external fun nativeLook(dx: Float, dy: Float)
+    @JvmStatic private external fun nativeSetPadMap(spec: String)
 
     /** Opens the disc (the file descriptor is handed over) and checks it. */
     fun start(isoPath: String, filesDir: String): Boolean = available && nativeStart(isoPath, filesDir)
@@ -28,6 +29,11 @@ object NativeBridge {
     /** Pad state: buttons as Pad bits, the left stick from -1..1 (y up positive). */
     fun setPad(bits: Int, lx: Float, ly: Float) {
         if (available) nativeSetPad(bits, lx, ly)
+    }
+
+    /** The gamepad's button map for the PS2 controls: the "key=value" lines of PadMapping.serialize. */
+    fun setPadMap(spec: String) {
+        if (available) nativeSetPadMap(spec)
     }
 
     fun stop() {

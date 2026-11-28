@@ -38,12 +38,31 @@ class TouchOverlay(context: Context) : View(context) {
             invalidate()
         }
 
+    /**
+     * True while a controller is in use and the setting hides the pad: nothing is drawn and no touch reaches the pad. A
+     * finger on the screen brings it back (onTouchEvent).
+     */
+    var hiddenByPad = false
+        private set
+
+    /** A controller was used (a button, a stick past half-way): the pad steps back until a finger touches the screen. */
+    fun onControllerUsed() {
+        if (editing || hiddenByPad) return
+        hiddenByPad = true
+        releaseAll()
+        invalidate()
+    }
+
     /** The controls are drawn at this share of their set opacity: the picture stays visible under them. */
     private val gameOpacity = 0.5f
+
+    /** The knob's diameter as a share of the base's width (the art's own proportion). */
+    private val knobScale = 0.42f
 
     var editing = false
         set(value) {
             field = value
+            if (value) hiddenByPad = false
             dragging = false
             if (!value) selected = null
             invalidate()
@@ -88,7 +107,7 @@ class TouchOverlay(context: Context) : View(context) {
         return RectF(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
     }
 
-    private fun hit(x: Float, y: Float): Slot? = if (menuMode && !editing) null else slots.lastOrNull { s ->
+    private fun hit(x: Float, y: Float): Slot? = if ((menuMode || hiddenByPad) && !editing) null else slots.lastOrNull { s ->
         val r = boundsOf(s)
         hypot(x - r.centerX(), y - r.centerY()) <= r.width() / 2 * 1.15f
     }
@@ -124,13 +143,13 @@ class TouchOverlay(context: Context) : View(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
-        if (menuMode && !editing) return
+        if ((menuMode || hiddenByPad) && !editing) return
         for (s in slots) {
             val r = boundsOf(s)
             paint.alpha = (s.alpha * gameOpacity * 255).toInt()
             canvas.drawBitmap(bitmap(s.control), null, r, paint)
             if (s.control.isStick) {
-                val k = r.width() * 0.42f
+                val k = r.width() * knobScale
                 val kx = r.centerX() + knobOffset.x
                 val ky = r.centerY() + knobOffset.y
                 canvas.drawBitmap(knob, null, RectF(kx - k / 2, ky - k / 2, kx + k / 2, ky + k / 2), paint)
@@ -142,6 +161,11 @@ class TouchOverlay(context: Context) : View(context) {
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         if (editing) return editTouch(e)
+        if (hiddenByPad) {
+            if (e.actionMasked != MotionEvent.ACTION_DOWN && e.actionMasked != MotionEvent.ACTION_POINTER_DOWN) return true
+            hiddenByPad = false
+            invalidate()
+        }
         // A finger the event no longer lists has lifted (its up was lost): let it go, or the stick stays deflected.
         val present = HashSet<Int>()
         for (i in 0 until e.pointerCount) present.add(e.getPointerId(i))
@@ -265,12 +289,15 @@ class TouchOverlay(context: Context) : View(context) {
     private fun moveStick(s: Slot, px: Float, py: Float) {
         val base = boundsOf(s)
         val radius = base.width() / 2
+        // The knob's centre runs no further than the rim less the knob's own radius, so the whole knob stays inside the
+        // base's circle. Full deflection is reached when the knob is at that limit.
+        val travel = radius - base.width() * knobScale / 2
         val dx = px - base.centerX()
         val dy = py - base.centerY()
         val len = hypot(dx, dy)
-        val reach = if (len > radius) radius / len else 1f
+        val reach = if (len > travel) travel / len else 1f
         knobOffset.set(dx * reach, dy * reach)
-        val frac = len / radius
+        val frac = len / travel
         val dead = 0.08f
         if (frac <= dead || len == 0f) {
             stickVector.set(0f, 0f)

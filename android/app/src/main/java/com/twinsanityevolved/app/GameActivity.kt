@@ -6,13 +6,17 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
+import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.SeekBar
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import org.libsdl.app.SDLActivity
@@ -29,6 +33,12 @@ class GameActivity : SDLActivity() {
     private lateinit var touchPad: TouchOverlay
     private lateinit var menuPanel: LinearLayout
     private lateinit var editPanel: LinearLayout
+    private lateinit var controllerPanel: LinearLayout
+    private lateinit var mapPanel: ScrollView
+    /** The gamepad's button map (PadMapping): the control being set, and the rows that show each control's button. */
+    private var padMap: MutableMap<String, String> = PadMapping.defaults()
+    private var capturing: String? = null
+    private val mapRows = HashMap<String, Button>()
     private lateinit var notice: TextView
     private lateinit var screenButton: Button
     private lateinit var sizeBar: SeekBar
@@ -79,6 +89,8 @@ class GameActivity : SDLActivity() {
         }
         menuPanel = buildMenu()
         editPanel = buildEditPanel()
+        controllerPanel = buildControllerPanel()
+        mapPanel = buildMapPanel()
 
         // Transparent: the engine's picture is underneath.
         addContentView(
@@ -94,10 +106,15 @@ class GameActivity : SDLActivity() {
                     }
                 )
                 addView(editPanel, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.TOP).apply { topMargin = dp(56) })
+                addView(controllerPanel, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.TOP).apply { topMargin = dp(56) })
+                addView(mapPanel, FrameLayout.LayoutParams(MATCH, MATCH, Gravity.TOP).apply { topMargin = dp(56) })
             },
             FrameLayout.LayoutParams(MATCH, MATCH)
         )
         touchPad.postDelayed(menuWatch, 100)
+        // The engine reads the gamepad map when it starts, and takes a new one on its next frame.
+        padMap = settings.loadPadMap()
+        NativeBridge.setPadMap(PadMapping.serialize(padMap))
         openDisc()
     }
 
@@ -148,6 +165,9 @@ class GameActivity : SDLActivity() {
             addView(menuItem(getString(R.string.menu_edit)) {
                 hideMenu()
                 setEditing(true)
+            })
+            addView(menuItem(getString(R.string.menu_controller)) {
+                showControllerPanel(true)
             })
             addView(screenButton)
             addView(menuItem(getString(R.string.menu_mods)) {
@@ -250,6 +270,124 @@ class GameActivity : SDLActivity() {
         touchPad.selected = null
         touchPad.slots = settings.loadSlots()
         touchPad.refresh()
+    }
+
+    // ----- the controller: hiding the touch pad, and the button map -----------------------------------------------
+
+    private fun buildControllerPanel(): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setBackgroundColor(0xE6101010.toInt())
+        setPadding(dp(16), dp(10), dp(16), dp(10))
+        visibility = View.GONE
+        addView(TextView(this@GameActivity).apply {
+            text = getString(R.string.controller_title)
+            setTextColor(Color.WHITE)
+        })
+        addView(Switch(this@GameActivity).apply {
+            text = getString(R.string.controller_hide_touch)
+            setTextColor(Color.WHITE)
+            isChecked = settings.hideTouchWithPad
+            setOnCheckedChangeListener { _, on -> settings.hideTouchWithPad = on }
+        })
+        addView(menuItem(getString(R.string.controller_edit_map)) { showMapPanel(true) })
+        addView(menuItem(getString(R.string.controller_reset_map)) { resetPadMap() })
+        addView(menuItem(getString(R.string.edit_done)) { showControllerPanel(false) })
+    }
+
+    private fun buildMapPanel(): ScrollView = ScrollView(this).apply {
+        setBackgroundColor(0xE6101010.toInt())
+        visibility = View.GONE
+        addView(LinearLayout(this@GameActivity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+            addView(TextView(this@GameActivity).apply {
+                text = getString(R.string.map_title)
+                setTextColor(Color.WHITE)
+            })
+            for (c in PadMapping.controls) {
+                val row = menuItem("") { toggleCapture(c.key) }
+                mapRows[c.key] = row
+                addView(row)
+            }
+            addView(menuItem(getString(R.string.edit_done)) { showMapPanel(false) })
+        })
+    }
+
+    private fun showControllerPanel(on: Boolean) {
+        hideMenu()
+        controllerPanel.visibility = if (on) View.VISIBLE else View.GONE
+        if (on) mapPanel.visibility = View.GONE
+    }
+
+    private fun showMapPanel(on: Boolean) {
+        hideMenu()
+        capturing = null
+        mapPanel.visibility = if (on) View.VISIBLE else View.GONE
+        if (on) {
+            controllerPanel.visibility = View.GONE
+            refreshMapRows()
+        } else {
+            showControllerPanel(true)   // back to the controller's menu
+        }
+    }
+
+    /** Tapping a control arms it: the next controller button pressed becomes its button. Tapping it again cancels. */
+    private fun toggleCapture(key: String) {
+        capturing = if (capturing == key) null else key
+        refreshMapRows()
+    }
+
+    private fun refreshMapRows() {
+        for (c in PadMapping.controls) {
+            val row = mapRows[c.key] ?: continue
+            row.text = if (capturing == c.key) {
+                "${c.label}  \u2192  ${getString(R.string.map_press)}"
+            } else {
+                "${c.label}  \u2192  ${PadMapping.controllerLabel(padMap[c.key] ?: c.default)}"
+            }
+        }
+    }
+
+    private fun finishCapture(name: String) {
+        val key = capturing ?: return
+        PadMapping.assign(padMap, key, name)
+        capturing = null
+        settings.savePadMap(padMap)
+        NativeBridge.setPadMap(PadMapping.serialize(padMap))
+        refreshMapRows()
+    }
+
+    private fun resetPadMap() {
+        padMap = PadMapping.defaults()
+        settings.resetPadMap()
+        NativeBridge.setPadMap(PadMapping.serialize(padMap))
+        refreshMapRows()
+    }
+
+    /**
+     * A controller's button or stick, seen by the activity (SDL's own events come through here too): while a control is
+     * being set, the press is the new button; otherwise it hides the touch pad when the setting asks for it.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (PadMapping.isGamepad(event.source)) {
+            if (capturing != null) {
+                if (event.action == KeyEvent.ACTION_DOWN) PadMapping.keyName(event.keyCode)?.let { finishCapture(it) }
+                return true   // the controller's buttons are not the game's while one is being set
+            }
+            if (event.action == KeyEvent.ACTION_DOWN && settings.hideTouchWithPad) touchPad.onControllerUsed()
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (PadMapping.isJoystick(event.source) && event.actionMasked == MotionEvent.ACTION_MOVE) {
+            if (capturing != null) {
+                PadMapping.motionName(event)?.let { finishCapture(it) }
+            } else if (settings.hideTouchWithPad && PadMapping.moved(event)) {
+                touchPad.onControllerUsed()
+            }
+        }
+        return super.dispatchGenericMotionEvent(event)
     }
 
     // ----- the engine ---------------------------------------------------------------------------------------------

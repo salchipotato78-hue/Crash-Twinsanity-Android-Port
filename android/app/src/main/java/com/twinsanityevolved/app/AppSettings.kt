@@ -69,4 +69,22 @@ class AppSettings(context: Context) {
     fun resetSlots() {
         prefs.edit().remove(LAYOUT_KEY).apply()
     }
+
+    /** With a controller in use the touch pad hides (and comes back when a finger touches the screen). */
+    var hideTouchWithPad: Boolean
+        get() = prefs.getBoolean("hide_touch_with_pad", true)
+        set(value) {
+            prefs.edit().putBoolean("hide_touch_with_pad", value).apply()
+        }
+
+    /** The controller's buttons for the PS2 controls: the saved map, or the default one. */
+    fun loadPadMap(): MutableMap<String, String> = PadMapping.parse(prefs.getString("pad_map", null))
+
+    fun savePadMap(map: Map<String, String>) {
+        prefs.edit().putString("pad_map", PadMapping.serialize(map)).apply()
+    }
+
+    fun resetPadMap() {
+        prefs.edit().remove("pad_map").apply()
+    }
 }
