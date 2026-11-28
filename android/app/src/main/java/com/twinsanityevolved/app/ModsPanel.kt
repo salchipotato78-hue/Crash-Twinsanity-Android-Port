@@ -88,7 +88,7 @@ class ModsPanel(private val activity: GameActivity) {
             setOnCheckedChangeListener { _, on -> ModSettings.setEnabled(ctx, m.id, on) }
         })
         box.addView(Button(ctx).apply {
-            text = "Quitar"
+            this.text = "Quitar"
             setOnClickListener { confirmRemove(m) }
         })
         return box

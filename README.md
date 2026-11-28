@@ -3,20 +3,43 @@
 
 # TwinsanityEvolved Android Port
 
-TwinsanityEvolved is a native PC port of Crash Twinsanity: the [twinsanity-reversed](https://github.com/Smartkin/twinsanity-reversed)
+Native PC port of Crash Twinsanity: the [twinsanity-reversed](https://github.com/Smartkin/twinsanity-reversed)
 decompilation (`game/`) running on the NativeEE engine (`engine/`).
 The game is compiled to wasm32 and lowered to C with wasm2c; its linear memory is the engine's 32 MB main memory; the
-decompilation's own `include/platform/*.h` is the only seam.
+decompilation's own `include/platform/*.h` is the only seam. On the PS Vita the game's code is compiled natively for the
+console's ARM processor instead, with the same seam and the 32 MB as a block of the program. No game data of any kind is in
+this repository — you need your own disc image, which is read at run time.
 
-This is an Android port of that project, bringing the full *Crash Twinsanity* experience to the palm of your hand.
+## What's new
 
-## How to play it
+Since v0.1.8 (the full list for players is in [RELEASE-NOTES.txt](RELEASE-NOTES.txt)):
 
-1. From the latest release, download `Twinsanity-Evolved.apk`
-2. Open the app, It will automatically take you to the file picker so you can choose your own game .iso file.
-3. Pick your iso and play!!
+- **The launcher installs the finished game** for Windows, macOS, Linux or the PS Vita from the releases, into one game
+  folder that holds the game, your settings, your memory cards and your mods.
+- **The North American disc plays**, and every disc is recognised by its content against the known dumps of the
+  original discs.
+- **Mods:** mods packaged as Mod Crates are supported, as are patched disc images, xdelta / PPF / BPS patches, folders of
+  files and single archive files, added on the launcher's Mods page or with the mod tool.
+- **Languages:** the text and the speech are two settings, and the game's texts can be read in Arabic.
+- **PS Vita:** a package in every release, the PAL console's 50 Hz game loop, its movies, shadows and title sequence
+  fixed, and a steadier, faster picture.
+- **Fixed:** at 50 Hz the game no longer plays in slow motion, on every system.
 
-##
+## Play: download the game
+
+1. From the latest release, download the zip for your system: `twinsanityevolved-<version>-windows-x64.zip`,
+   `-macos-arm64.zip` (Apple silicon), `-macos-x86_64.zip`, `-linux-x86_64.zip` or `-linux-aarch64.zip`.
+2. Unzip it anywhere you like, on any drive.
+3. Start `twinsanityevolved` (`twinsanityevolved.exe` on Windows). The first time, it asks for your disc image: choose
+   your own Crash Twinsanity image (`.iso`) -- the **PAL** disc (SLES-52568) or the **North American** disc (SLUS-20909
+   v2.00). That is all: nothing is installed, nothing else is downloaded, and nothing is written outside the game's folder.
+
+The game remembers your disc in `disc-image.txt` and keeps its memory cards and settings in `userdata\` beside it
+(an earlier install's `~/.twinsanityevolved` keeps being used if you have one). Deleting the folder removes everything.
+The zip holds only the program, the mod tool (`twinsanityevolved-modtool`, see Mods), the Arabic language pack
+(`mods/arabic`, see Arabic), their libraries and the licences: no game data, which is read from your disc while you play (every release
+zip passes `tools/ci/asset_scan.py`, which fails on any disc file or game asset).
+
 **50 Hz.** A PAL console runs the game at 50 frames a second; the port runs it at 60 by default. For the PAL console's own
 50 ticks a second, open Options → graphic options → **game rate** and choose **50 hz (pal)**: it takes effect the next time
 the game starts (the setting is `game.hz = 50` in `userdata/ps2r.ini`; `--hz 50` does the same for one run). The game moves
