@@ -10,6 +10,10 @@
 #include "engine/platform/sdl/input/gamepad_backend.h"
 #include "engine/platform/sdl/input/input_backend.h"
 #include "engine/platform/sdl/input/keyboard_mouse_backend.h"
+#if defined(__ANDROID__)
+// The game's menu state (android/native/src/twinsanityevolved_jni.cpp).
+extern "C" bool te_android_menu_open();
+#endif
 
 namespace ps2r::platform::sdl {
 
@@ -158,6 +162,17 @@ PadSample InputSystem::Frame(float dt_seconds) {
         // On the phone the sticks are the touch one and a controller's: a keyboard's keys never move Crash (its buttons
         // still count). Controllers' sticks are merged with the touch stick below, the larger deflection winning.
         if (be == kbm_.get()) { one.lx = one.ly = one.rx = one.ry = 0.f; }
+        if (be == gamepad_.get() && te_android_menu_open()) {
+            // In a menu the controller's left stick steps the menu like the touch stick does (a push past half-way is
+            // a d-pad press); a resting or gently moved stick does nothing, so the menu does not move by itself.
+            constexpr float kMenuPush = 0.5f;
+            if (one.lx >  kMenuPush) one.buttons |= kBtnRight;
+            if (one.lx < -kMenuPush) one.buttons |= kBtnLeft;
+            if (one.ly >  kMenuPush) one.buttons |= kBtnDown;   // the sticks run y DOWN positive, as the mapper's
+            if (one.ly < -kMenuPush) one.buttons |= kBtnUp;
+            one.lx = one.ly = 0.f;
+            one.rx = one.ry = 0.f;
+        }
 #endif
         merged.buttons |= one.buttons;
         merged.lx = Pick(merged.lx, one.lx);
