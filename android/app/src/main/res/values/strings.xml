@@ -16,6 +16,15 @@
     <string name="map_title">Tap a control, then press the controller button for it. Tap it again to cancel.</string>
     <string name="map_press">press a button…</string>
     <string name="menu_change_disc">Change disc</string>
+    <string name="menu_export_saves">Export saves…</string>
+    <string name="menu_import_saves">Import saves…</string>
+    <string name="saves_exported">Exported %1$d save files.</string>
+    <string name="saves_imported">Imported %1$d save files.</string>
+    <string name="saves_none">There are no saves to export yet.</string>
+    <string name="saves_failed">Saves: %1$s</string>
+    <string name="saves_import_title">Import saves?</string>
+    <string name="saves_import_warning">The saves on this device (memory cards and save states) will be replaced by the backup. The game restarts.</string>
+    <string name="saves_import_ok">Replace and restart</string>
     <string name="menu_mods">Mods…</string>
     <string name="menu_quit">Quit</string>
     <string name="edit_title">Drag a control to move it. Adjust its size and opacity below.</string>
