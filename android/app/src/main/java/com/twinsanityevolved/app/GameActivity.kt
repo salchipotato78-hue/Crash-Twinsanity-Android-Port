@@ -34,6 +34,7 @@ class GameActivity : SDLActivity() {
     private lateinit var sizeBar: SeekBar
     private lateinit var alphaBar: SeekBar
     private var engineStarted = false
+    private val mods by lazy { ModsPanel(this) }
 
     /** SDL loads libSDL2 first, then this library, which exports SDL_main (native/src/twinsanityevolved_jni.cpp). */
     override fun getLibraries(): Array<String> = arrayOf("SDL2", "twinsanityevolved")
@@ -149,6 +150,10 @@ class GameActivity : SDLActivity() {
                 setEditing(true)
             })
             addView(screenButton)
+            addView(menuItem(getString(R.string.menu_mods)) {
+                hideMenu()
+                mods.show()
+            })
             addView(menuItem(getString(R.string.menu_change_disc)) {
                 hideMenu()
                 startActivityForResult(RomStore.pickerIntent(), REQ_CHANGE_DISC)
@@ -271,6 +276,10 @@ class GameActivity : SDLActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == ModsPanel.REQ_PICK) {
+            if (resultCode == RESULT_OK) data?.data?.let { mods.onPicked(it) }
+            return
+        }
         if (requestCode != REQ_CHANGE_DISC || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         if (RomStore.accept(this, uri)) {

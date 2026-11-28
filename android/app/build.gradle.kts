@@ -17,9 +17,27 @@ android {
         versionName = "0.1.1"
     }
 
+    // A fixed key, so each build installs over the last one (Android refuses an update signed by another key).
+    // CI sets KEYSTORE_PATH, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD from repository secrets; without them the
+    // build keeps the default debug signing.
+    signingConfigs {
+        create("fixed") {
+            System.getenv("KEYSTORE_PATH")?.let { path ->
+                storeFile = file(path)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
+        getByName("debug") {
+            if (System.getenv("KEYSTORE_PATH") != null) signingConfig = signingConfigs.getByName("fixed")
+        }
         release {
             isMinifyEnabled = false
+            if (System.getenv("KEYSTORE_PATH") != null) signingConfig = signingConfigs.getByName("fixed")
         }
     }
 

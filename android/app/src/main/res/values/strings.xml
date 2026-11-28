@@ -9,6 +9,7 @@
     <string name="menu_edit">Editar controles</string>
     <string name="menu_screen">Pantalla: %1$s</string>
     <string name="menu_change_disc">Cambiar disco</string>
+    <string name="menu_mods">Mods…</string>
     <string name="menu_quit">Salir</string>
     <string name="edit_title">Arrastra un control para moverlo. Ajusta tamaño y opacidad abajo.</string>
     <string name="edit_size">Tamaño</string>
