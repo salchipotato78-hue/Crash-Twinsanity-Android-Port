@@ -36,6 +36,14 @@ void Startup(int* argc, char*** argv) {
     // blocks in libEGL for 30 s (the game thread waits on it). The game is landscape-only (AndroidManifest:
     // sensorLandscape), so pin the orientation to landscape before the window exists.
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+    // Controllers over Bluetooth (a DualShock 4, a DualSense) reach SDL through HIDAPI, which on Android starts its
+    // Bluetooth side only when the Steam hint asks for it (SDL's HIDDeviceManager initialises Bluetooth for that hint
+    // alone; SDL then asks for BLUETOOTH_CONNECT itself, on Android 12 and later). Without it a paired DS4 reaches the
+    // app only through Android's generic input, and its buttons do not reach the game. The PS4 and PS5 drivers are
+    // named too, so a DS4 and a DualSense take the HIDAPI path.
+    SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_STEAM, "1");
+    SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS4, "1");
+    SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS5, "1");
     // SDL's first environment read asks the Java side for the manifest's variables (Android_JNI_GetManifestEnvironmentVariables).
     // That JNI call must run here, on SDL's own thread: from the game's fiber (a malloc'd stack that ART does not know)
     // it raises a StackOverflowError and aborts. SDL_InitSubSystem(SDL_INIT_EVENTS) runs the same first read before the fiber.
