@@ -14,7 +14,7 @@ android {
         // Android installs an APK over the installed one only when its versionCode is higher. CI sets VERSION_CODE from
         // its run number, so every CI build updates the last; a local build keeps the default unless it sets it.
         versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 4
-        versionName = System.getenv("VERSION_NAME") ?: "0.1.3"
+        versionName = System.getenv("VERSION_NAME") ?: "0.0.1"
     }
 
     // A fixed key, so each build installs over the last one (Android refuses an update signed by another key).
