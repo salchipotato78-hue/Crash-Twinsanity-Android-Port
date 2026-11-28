@@ -8,6 +8,13 @@
     <string name="menu_edit">Edit controls</string>
     <string name="menu_screen">Screen: %1$s</string>
     <string name="screen_applies_next">The screen change applies the next time you start the game.</string>
+    <string name="menu_controller">Controller…</string>
+    <string name="controller_title">Controller</string>
+    <string name="controller_hide_touch">Hide the touch controls while a controller is used</string>
+    <string name="controller_edit_map">Edit button mapping</string>
+    <string name="controller_reset_map">Reset button mapping</string>
+    <string name="map_title">Tap a control, then press the controller button for it. Tap it again to cancel.</string>
+    <string name="map_press">press a button…</string>
     <string name="menu_change_disc">Change disc</string>
     <string name="menu_mods">Mods…</string>
     <string name="menu_quit">Quit</string>
