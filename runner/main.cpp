@@ -36,7 +36,7 @@
 #include "engine/ee/mem/main_memory.h"
 #include "engine/core/config/config_loader.h"
 #include "engine/core/config/settings_file.h"
-#include "engine/app/host/user_data.h"
+#include "app/host/user_data.h"
 #include "engine/platform/ps2e/present_pacer.h"
 #include "te_graphics_hooks.h"
 #include "engine/platform/host/platform.h"
